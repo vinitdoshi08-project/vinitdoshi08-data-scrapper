@@ -1,4 +1,5 @@
-import pandas as pd
+from openpyxl import Workbook, load_workbook
+from openpyxl.styles import Font
 from fpdf import FPDF
 from datetime import datetime
 import os
@@ -111,32 +112,35 @@ def fetch_playlist_videos(playlist_id):
 # Save data to Excel (append if file exists)
 def save_to_excel(data, file_name):
     try:
-        df = pd.DataFrame(data)
+        headers = list(data[0].keys())
         if os.path.exists(file_name):
-            existing_df = pd.read_excel(file_name, engine='openpyxl')
-            combined_df = pd.concat([existing_df, df]).drop_duplicates(subset=['Video Link'], keep='last')
+            wb = load_workbook(file_name)
+            ws = wb.active
         else:
-            combined_df = df
-
-        # Save to Excel with formatting
-        with pd.ExcelWriter(file_name, engine='openpyxl') as writer:
-            combined_df.to_excel(writer, index=False, sheet_name='Video Data')
-
-            # Apply formatting (bold headers)
-            workbook = writer.book
-            worksheet = writer.sheets['Video Data']
-            for cell in worksheet[1]:
-                cell.font = cell.font.copy(bold=True)  # Make headers bold
-
-            # Apply blue color and make the links clickable
-            for row in worksheet.iter_rows(min_row=2, max_col=combined_df.shape[1], max_row=combined_df.shape[0] + 1):
-                for cell in row:
-                    if "http" in str(cell.value):  # Check if it's a URL
-                        cell.font = cell.font.copy(color="0000FF")  # Set font color to blue
-                        cell.hyperlink = cell.value  # Make it clickable
-
+            wb = Workbook()
+            ws = wb.active
+            for col, header in enumerate(headers, 1):
+                cell = ws.cell(row=1, column=col, value=header)
+                cell.font = Font(bold=True)
+        existing_links = set()
+        for row in ws.iter_rows(min_row=2, values_only=True):
+            link_col = headers.index('Video Link') + 1 if 'Video Link' in headers else None
+            if link_col and row[link_col - 1]:
+                existing_links.add(row[link_col - 1])
+        next_row = ws.max_row + 1 if ws.max_row > 1 else 2
+        for item in data:
+            if item.get('Video Link') in existing_links:
+                continue
+            for col, header in enumerate(headers, 1):
+                value = item.get(header, '')
+                cell = ws.cell(row=next_row, column=col, value=value)
+                if value and "http" in str(value):
+                    cell.font = Font(color="0000FF")
+                    cell.hyperlink = str(value)
+            next_row += 1
+        wb.save(file_name)
         print(f"Data saved to {file_name}")
-        return len(data)  # Return the number of records saved
+        return len(data)
     except Exception as e:
         print(f"Error saving data to Excel: {e}")
         return 0
