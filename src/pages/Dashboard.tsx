@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Youtube, Globe, Map, LogOut, Settings, ArrowRight, X, User as UserIcon, Edit2, Check, Loader2 } from 'lucide-react';
+import { Youtube, Globe, Map, LogOut, Settings, ArrowRight, X, Edit2, Check, Loader2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 export function Dashboard() {
@@ -71,12 +71,9 @@ export function Dashboard() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
       <nav className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-2">
-              <Youtube className="h-8 w-8 text-red-600" />
-              <span className="text-xl font-bold bg-gradient-to-r from-red-600 to-blue-600 bg-clip-text text-transparent">
-                DataScrapr
-              </span>
+          <div className="flex justify-between items-center h-24">
+            <div className="flex items-center">
+              <img src="/scrapify_logo.png" alt="Scrapify" className="h-20 w-60 object-contain rounded-xl" />
             </div>
 
             <div className="flex items-center space-x-4">

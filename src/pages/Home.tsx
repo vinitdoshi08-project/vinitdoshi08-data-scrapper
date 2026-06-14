@@ -1,17 +1,14 @@
 import { Link } from 'react-router-dom';
-import { Youtube, Globe, Map, ArrowRight, Zap, Shield, Download, CheckCircle } from 'lucide-react';
+import { Globe, Map, ArrowRight, Zap, Shield, Download, CheckCircle, Youtube } from 'lucide-react';
 
 export function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
       <nav className="bg-white shadow-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-2">
-              <Youtube className="h-8 w-8 text-red-600" />
-              <span className="text-xl font-bold bg-gradient-to-r from-red-600 to-blue-600 bg-clip-text text-transparent">
-                DataScrapr
-              </span>
+          <div className="flex justify-between items-center h-20">
+            <div className="flex items-center">
+              <img src="/scrapify_logo.png" alt="Scrapify" className="h-20 w-64 object-contain" style={{maxHeight:'72px'}} />
             </div>
             <div className="hidden md:flex items-center space-x-8">
               <a href="#features" className="text-gray-600 hover:text-blue-600 transition-colors">Features</a>
@@ -224,9 +221,8 @@ export function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div>
-              <div className="flex items-center space-x-2 mb-4">
-                <Youtube className="h-6 w-6 text-red-600" />
-                <span className="text-lg font-bold">DataScrapr</span>
+              <div className="flex items-center mb-4">
+                <img src="/scrapify_logo.png" alt="Scrapify" className="h-20 w-64 object-contain brightness-0 invert" />
               </div>
               <p className="text-gray-400">
                 Professional data scraping platform for modern users.
@@ -254,14 +250,14 @@ export function Home() {
             <div>
               <h3 className="font-bold mb-4">Contact</h3>
               <ul className="space-y-2 text-gray-400">
-                <li>support@datascrapr.com</li>
+                <li>support@scrapify.com</li>
                 <li>Community Forum</li>
               </ul>
             </div>
           </div>
 
           <div className="mt-8 pt-8 border-t border-gray-800 text-center text-gray-400">
-            <p>2025 DataScrapr. All rights reserved.</p>
+            <p>2025 Scrapify. All rights reserved.</p>
           </div>
         </div>
       </footer>

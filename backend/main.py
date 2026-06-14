@@ -1,6 +1,7 @@
-from fastapi import FastAPI, HTTPException, Form, Body, Depends
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import FastAPI, HTTPException, Form
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
+from googleapiclient.errors import HttpError
 import os
 import re
 import tempfile
@@ -8,58 +9,81 @@ import sqlite3
 import bcrypt
 import jwt
 import uuid
+import base64
+import hashlib
+from cryptography.fernet import Fernet
 from datetime import datetime, timedelta
-from typing import Optional
 from pydantic import BaseModel, EmailStr
-from scraper import extract_id_from_url, fetch_playlist_videos, fetch_video_details, save_to_excel, save_to_pdf, save_to_json
+from scraper import (
+    extract_id_from_url, fetch_playlist_videos, fetch_video_details,
+    save_to_excel, save_to_pdf, save_to_json, DEFAULT_API_KEY,
+)
 
 app = FastAPI()
 
+# ── CORS — allow everything (Netlify + localhost) ─────────────
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:5174", "http://localhost:3000", "http://localhost:5175", "http://127.0.0.1:5173", "http://127.0.0.1:5174"],
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Video-Count", "Content-Length", "Content-Disposition"],
 )
 
-# Database Configuration
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# ── Config ────────────────────────────────────────────────────
+BASE_DIR    = os.path.dirname(os.path.abspath(__file__))
 DATABASE_URL = os.path.join(BASE_DIR, "users.db")
-SECRET_KEY = "your_secret_key_change_this_for_production"
-ALGORITHM = "HS256"
+SECRET_KEY  = os.environ.get("SECRET_KEY", "your_secret_key_change_this_for_production")
+ALGORITHM   = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 1 day
 
-print(f"Database path: {DATABASE_URL}")
+# Fernet key derived from SECRET_KEY (stable across restarts)
+_raw_key   = hashlib.sha256(SECRET_KEY.encode()).digest()
+FERNET_KEY = base64.urlsafe_b64encode(_raw_key)
+fernet     = Fernet(FERNET_KEY)
 
-def get_db():
-    conn = sqlite3.connect(DATABASE_URL)
-    conn.row_factory = sqlite3.Row
-    try:
-        yield conn
-    finally:
-        conn.close()
+def encrypt_api_key(key: str) -> str:
+    return fernet.encrypt(key.encode()).decode()
 
+def decrypt_api_key(enc: str) -> str:
+    return fernet.decrypt(enc.encode()).decode()
+
+def mask_api_key(key: str) -> str:
+    if len(key) <= 11:
+        return key[:4] + "••••"
+    return key[:8] + "••••••••••••" + key[-3:]
+
+# ── DB init ───────────────────────────────────────────────────
 def init_db():
     conn = sqlite3.connect(DATABASE_URL)
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id TEXT PRIMARY KEY,
-            full_name TEXT NOT NULL,
-            email TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        full_name TEXT NOT NULL,
+        email TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )''')
+    c.execute('''CREATE TABLE IF NOT EXISTS user_api_keys (
+        user_id TEXT PRIMARY KEY,
+        encrypted_key TEXT NOT NULL,
+        quota_exceeded INTEGER DEFAULT 0,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )''')
     conn.commit()
     conn.close()
 
 init_db()
+print(f"DB: {DATABASE_URL}")
 
-# Models
+# ── Models ────────────────────────────────────────────────────
 class UserSignup(BaseModel):
     full_name: str
+    email: EmailStr
+    password: str
+
+class UserLogin(BaseModel):
     email: EmailStr
     password: str
 
@@ -68,245 +92,252 @@ class UserUpdate(BaseModel):
     email: EmailStr
     token: str
 
-class UserLogin(BaseModel):
-    email: EmailStr
-    password: str
+class ApiKeyPayload(BaseModel):
+    token: str
+    api_key: str
 
-# Helper Functions
-def hash_password(password: str) -> str:
-    salt = bcrypt.gensalt()
-    return bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
+# ── Helpers ───────────────────────────────────────────────────
+def hash_password(pw: str) -> str:
+    return bcrypt.hashpw(pw.encode(), bcrypt.gensalt()).decode()
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
+def verify_password(plain: str, hashed: str) -> bool:
+    return bcrypt.checkpw(plain.encode(), hashed.encode())
 
-def create_access_token(data: dict):
-    to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+def create_access_token(data: dict) -> str:
+    payload = {**data, "exp": datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)}
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
-# Auth Endpoints
+def decode_token(token: str) -> str:
+    """Decode JWT and return user_id (sub). Works for both custom JWTs and
+    Supabase JWTs — for Supabase we just extract 'sub' without verifying
+    the Supabase secret (we don't have it), so we use decode without verification
+    only to get the user identifier for API-key lookup."""
+    try:
+        # Try our own JWT first (signed with SECRET_KEY)
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload.get("sub") or payload.get("id")
+    except jwt.InvalidTokenError:
+        pass
+    try:
+        # Fallback: decode without verification (Supabase token)
+        payload = jwt.decode(token, options={"verify_signature": False})
+        return payload.get("sub") or payload.get("id")
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+# ── Auth endpoints ────────────────────────────────────────────
 @app.post("/api/auth/signup")
 async def signup(user: UserSignup):
-    print(f"Signup attempt for: {user.email}")
     conn = sqlite3.connect(DATABASE_URL)
-    cursor = conn.cursor()
-    
+    c = conn.cursor()
     try:
-        # Check if user already exists
-        cursor.execute("SELECT id FROM users WHERE email = ?", (user.email.lower(),))
-        if cursor.fetchone():
-            print(f"Signup failed: Email {user.email} already exists")
+        c.execute("SELECT id FROM users WHERE email=?", (user.email.lower(),))
+        if c.fetchone():
             raise HTTPException(status_code=400, detail="Email already exists")
-        
-        user_id = str(uuid.uuid4())
-        hashed_pwd = hash_password(user.password)
-        
-        cursor.execute(
-            "INSERT INTO users (id, full_name, email, password) VALUES (?, ?, ?, ?)",
-            (user_id, user.full_name, user.email.lower(), hashed_pwd)
-        )
+        uid = str(uuid.uuid4())
+        c.execute("INSERT INTO users VALUES (?,?,?,?,?)",
+                  (uid, user.full_name, user.email.lower(), hash_password(user.password), datetime.utcnow().isoformat()))
         conn.commit()
-        
-        print(f"Signup successful for: {user.email}")
-        token = create_access_token({"sub": user_id, "email": user.email})
-        
-        return {
-            "token": token,
-            "user": {
-                "id": user_id,
-                "full_name": user.full_name,
-                "email": user.email,
-                "created_at": datetime.utcnow().isoformat()
-            }
-        }
+        token = create_access_token({"sub": uid, "email": user.email})
+        return {"token": token, "user": {"id": uid, "full_name": user.full_name, "email": user.email, "created_at": datetime.utcnow().isoformat()}}
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"Signup error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         conn.close()
 
 @app.post("/api/auth/login")
 async def login(credentials: UserLogin):
-    print(f"Login attempt for: {credentials.email}")
     conn = sqlite3.connect(DATABASE_URL)
     conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-    
+    c = conn.cursor()
     try:
-        cursor.execute("SELECT * FROM users WHERE email = ?", (credentials.email.lower(),))
-        user = cursor.fetchone()
-        
-        if not user:
-            print(f"Login failed: User {credentials.email} not found")
+        c.execute("SELECT * FROM users WHERE email=?", (credentials.email.lower(),))
+        user = c.fetchone()
+        if not user or not verify_password(credentials.password, user["password"]):
             raise HTTPException(status_code=401, detail="Invalid email or password")
-            
-        if not verify_password(credentials.password, user['password']):
-            print(f"Login failed: Invalid password for {credentials.email}")
-            raise HTTPException(status_code=401, detail="Invalid email or password")
-        
-        print(f"Login successful for: {credentials.email}")
-        token = create_access_token({"sub": user['id'], "email": user['email']})
-        
-        return {
-            "token": token,
-            "user": {
-                "id": user['id'],
-                "full_name": user['full_name'],
-                "email": user['email'],
-                "created_at": user['created_at']
-            }
-        }
+        token = create_access_token({"sub": user["id"], "email": user["email"]})
+        return {"token": token, "user": {"id": user["id"], "full_name": user["full_name"], "email": user["email"], "created_at": user["created_at"]}}
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"Login error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         conn.close()
 
 @app.get("/api/auth/me")
 async def get_me(token: str):
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id = payload.get("sub")
-        
-        conn = sqlite3.connect(DATABASE_URL)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, full_name, email, created_at FROM users WHERE id = ?", (user_id,))
-        user = cursor.fetchone()
-        conn.close()
-        
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-            
-        return {
-            "id": user['id'],
-            "full_name": user['full_name'],
-            "email": user['email'],
-            "created_at": user['created_at']
-        }
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token expired")
-    except jwt.InvalidTokenError:
-        raise HTTPException(status_code=401, detail="Invalid token")
+    uid = decode_token(token)
+    conn = sqlite3.connect(DATABASE_URL)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT id,full_name,email,created_at FROM users WHERE id=?", (uid,))
+    user = c.fetchone()
+    conn.close()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return dict(user)
 
 @app.put("/api/auth/profile")
-async def update_profile(update_data: UserUpdate):
+async def update_profile(data: UserUpdate):
+    uid = decode_token(data.token)
+    conn = sqlite3.connect(DATABASE_URL)
+    c = conn.cursor()
     try:
-        payload = jwt.decode(update_data.token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id = payload.get("sub")
-        
-        conn = sqlite3.connect(DATABASE_URL)
-        cursor = conn.cursor()
-
-        # Check if email is being updated to an existing one
-        cursor.execute("SELECT id FROM users WHERE email = ? AND id != ?", (update_data.email.lower(), user_id))
-        if cursor.fetchone():
-            conn.close()
+        c.execute("SELECT id FROM users WHERE email=? AND id!=?", (data.email.lower(), uid))
+        if c.fetchone():
             raise HTTPException(status_code=400, detail="Email already exists")
-
-        cursor.execute(
-            "UPDATE users SET full_name = ?, email = ? WHERE id = ?",
-            (update_data.full_name, update_data.email.lower(), user_id)
-        )
+        c.execute("UPDATE users SET full_name=?,email=? WHERE id=?", (data.full_name, data.email.lower(), uid))
         conn.commit()
-        conn.close()
-        
-        return {"message": "Profile updated successfully"}
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token expired")
-    except jwt.InvalidTokenError:
-        raise HTTPException(status_code=401, detail="Invalid token")
+        return {"message": "Profile updated"}
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
 
-def validate_file_name(file_name: str) -> bool:
-    if not file_name or len(file_name) > 100:
-        return False
-    return re.match(r'^[\w\-. ]+$', file_name) is not None
+# ── API Key endpoints ─────────────────────────────────────────
+@app.post("/api/apikey/save")
+async def save_api_key(payload: ApiKeyPayload):
+    uid = decode_token(payload.token)
+    if not payload.api_key or len(payload.api_key.strip()) < 10:
+        raise HTTPException(status_code=400, detail="Invalid API key")
+    enc = encrypt_api_key(payload.api_key.strip())
+    conn = sqlite3.connect(DATABASE_URL)
+    conn.execute('''INSERT INTO user_api_keys (user_id,encrypted_key,quota_exceeded,updated_at)
+        VALUES (?,?,0,?)
+        ON CONFLICT(user_id) DO UPDATE SET
+            encrypted_key=excluded.encrypted_key,
+            quota_exceeded=0,
+            updated_at=excluded.updated_at''',
+        (uid, enc, datetime.utcnow().isoformat()))
+    conn.commit()
+    conn.close()
+    return {"message": "API key saved", "masked_key": mask_api_key(payload.api_key.strip())}
+
+@app.get("/api/apikey/status")
+async def get_api_key_status(token: str):
+    uid = decode_token(token)
+    conn = sqlite3.connect(DATABASE_URL)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT encrypted_key,quota_exceeded FROM user_api_keys WHERE user_id=?", (uid,))
+    row = c.fetchone()
+    conn.close()
+    if not row:
+        return {"has_key": False, "masked_key": None, "quota_exceeded": False}
+    raw = decrypt_api_key(row["encrypted_key"])
+    return {"has_key": True, "masked_key": mask_api_key(raw), "quota_exceeded": bool(row["quota_exceeded"])}
+
+# ── Scrape endpoint ───────────────────────────────────────────
+def validate_file_name(name: str) -> bool:
+    return bool(name and len(name) <= 100 and re.match(r'^[\w\-. ]+$', name))
 
 def is_valid_youtube_url(url: str) -> bool:
-    patterns = [
-        r'^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+',
-        r'^https?:\/\/youtube\.com\/watch\?v=[\w-]+(&list=[\w-]+)?',
-        r'^https?:\/\/youtube\.com\/playlist\?list=[\w-]+',
-        r'^https?:\/\/youtu\.be\/[\w-]+(\?list=[\w-]+)?'
-    ]
-    return any(re.match(pattern, url) for pattern in patterns)
+    return bool(re.match(
+        r'^(https?://)?(www\.)?(youtube\.com|youtu\.be)/.+', url.strip()
+    ))
+
+def _is_quota_error(e: Exception) -> bool:
+    msg = str(e).lower()
+    return any(k in msg for k in ("quota", "quotaexceeded", "dailylimitexceeded", "403", "rateLimitExceeded".lower()))
 
 @app.post("/api/scrape")
 async def scrape_youtube(
-    url: str = Form(...),
-    file_name: str = Form(...),
-    file_format: str = Form(...)
+    url:         str = Form(...),
+    file_name:   str = Form(...),
+    file_format: str = Form(...),
+    token:       str = Form(default=""),
 ):
-    if not all([url, file_format, file_name]):
-        raise HTTPException(status_code=400, detail="Please fill all fields!")
-
     if not validate_file_name(file_name):
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid file name. Only letters, numbers, spaces, hyphens, underscores and dots allowed."
-        )
-
+        raise HTTPException(status_code=400, detail="Invalid file name.")
     if not is_valid_youtube_url(url):
+        raise HTTPException(status_code=400, detail="Invalid YouTube URL.")
+    if file_format not in ("xlsx", "pdf", "json"):
+        raise HTTPException(status_code=400, detail="Unsupported format. Use xlsx, pdf or json.")
+
+    # Resolve API key: user's stored key → env fallback
+    api_key = DEFAULT_API_KEY
+    uid = None
+    if token:
+        try:
+            uid = decode_token(token)
+            conn = sqlite3.connect(DATABASE_URL)
+            conn.row_factory = sqlite3.Row
+            c = conn.cursor()
+            c.execute("SELECT encrypted_key FROM user_api_keys WHERE user_id=?", (uid,))
+            row = c.fetchone()
+            conn.close()
+            if row:
+                api_key = decrypt_api_key(row["encrypted_key"])
+        except Exception:
+            pass  # fall back to env key
+
+    if not api_key:
         raise HTTPException(
             status_code=400,
-            detail="Invalid YouTube URL. Please provide valid video or playlist URL."
+            detail="No YouTube API key configured. Please add your API key in the scraper page."
         )
 
     try:
         url_type, id_value = extract_id_from_url(url)
         if not id_value:
-            raise HTTPException(
-                status_code=400,
-                detail="Could not extract video/playlist ID from URL"
-            )
+            raise HTTPException(status_code=400, detail="Could not extract video/playlist ID from URL.")
 
-        video_data = []
-        if url_type == 'playlist':
-            video_data = fetch_playlist_videos(id_value)
-        elif url_type == 'video':
-            video_data = [fetch_video_details(id_value)]
+        if url_type == "playlist":
+            video_data = fetch_playlist_videos(id_value, api_key)
+        else:
+            detail = fetch_video_details(id_value, api_key)
+            video_data = [detail] if detail else []
 
         if not video_data:
-            raise HTTPException(
-                status_code=404,
-                detail="No videos found. Playlist might be empty or private."
-            )
+            raise HTTPException(status_code=404, detail="No videos found. The playlist may be empty or private.")
 
-        temp_dir = tempfile.mkdtemp()
-        output_filename = f"{file_name}.{file_format}"
-        temp_file_path = os.path.join(temp_dir, output_filename)
+        temp_dir  = tempfile.mkdtemp()
+        out_name  = f"{file_name}.{file_format}"
+        out_path  = os.path.join(temp_dir, out_name)
 
-        if file_format == 'xlsx':
-            save_to_excel(video_data, temp_file_path)
-        elif file_format == 'pdf':
-            save_to_pdf(video_data, temp_file_path)
-        elif file_format == 'json':
-            save_to_json(video_data, temp_file_path)
+        if file_format == "xlsx":
+            save_to_excel(video_data, out_path)
+        elif file_format == "pdf":
+            save_to_pdf(video_data, out_path)
         else:
-            raise HTTPException(
-                status_code=400,
-                detail="Unsupported file format"
-            )
+            save_to_json(video_data, out_path)
 
         return FileResponse(
-            path=temp_file_path,
-            filename=output_filename,
-            media_type='application/octet-stream',
-            headers={"X-Video-Count": str(len(video_data))}
+            path=out_path,
+            filename=out_name,
+            media_type="application/octet-stream",
+            headers={
+                "X-Video-Count": str(len(video_data)),
+                "Access-Control-Expose-Headers": "X-Video-Count,Content-Disposition",
+            },
         )
 
     except HTTPException:
         raise
+    except HttpError as e:
+        if _is_quota_error(e):
+            # Mark quota exceeded so frontend unlocks the key field
+            if uid:
+                try:
+                    conn2 = sqlite3.connect(DATABASE_URL)
+                    conn2.execute("UPDATE user_api_keys SET quota_exceeded=1 WHERE user_id=?", (uid,))
+                    conn2.commit()
+                    conn2.close()
+                except Exception:
+                    pass
+            raise HTTPException(
+                status_code=429,
+                detail="quota_exceeded: Your YouTube API key has reached its daily limit. Please enter a new API key."
+            )
+        raise HTTPException(status_code=500, detail=f"YouTube API error: {str(e)}")
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Processing error: {str(e)}"
-        )
+        if _is_quota_error(e):
+            raise HTTPException(status_code=429, detail="quota_exceeded: Daily API quota reached. Please enter a new key.")
+        raise HTTPException(status_code=500, detail=f"Processing error: {str(e)}")
 
 @app.get("/")
 async def root():
