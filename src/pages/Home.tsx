@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Globe, Map, ArrowRight, Zap, Shield, Download, CheckCircle, Youtube } from 'lucide-react';
+import { Globe, Map, ArrowRight, Zap, Shield, Download, Youtube } from 'lucide-react';
 
 export function Home() {
   return (

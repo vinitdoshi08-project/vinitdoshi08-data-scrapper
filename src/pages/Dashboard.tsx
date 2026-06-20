@@ -9,6 +9,7 @@ export function Dashboard() {
   const [showComingSoon, setShowComingSoon] = useState(false);
   const [avatarError, setAvatarError] = useState(false);
   const [comingSoonType, setComingSoonType] = useState('');
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   // Settings / Profile states
   const [showSettings, setShowSettings] = useState(false);
@@ -58,8 +59,16 @@ export function Dashboard() {
     }
   }
 
+  function handleLogoutClick() {
+    setShowLogoutConfirm(true);
+  }
+
   function handleYouTubeClick() {
     navigate('/youtube-scraper');
+  }
+
+  function handleWebsiteClick() {
+    navigate('/website-scraper');
   }
 
   function handleComingSoon(type: string) {
@@ -112,7 +121,7 @@ export function Dashboard() {
                 <Settings className="h-5 w-5" />
               </button>
               <button
-                onClick={handleLogOut}
+                onClick={handleLogoutClick}
                 className="p-2 text-gray-600 hover:text-red-600 transition-colors bg-gray-50 hover:bg-red-50 rounded-full"
                 title="Logout"
               >
@@ -147,21 +156,18 @@ export function Dashboard() {
           </div>
 
           <div
-            onClick={() => handleComingSoon('Website')}
-            className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-2xl transition-all transform hover:-translate-y-2 cursor-pointer border-2 border-transparent hover:border-green-200 relative"
+            onClick={() => handleWebsiteClick()}
+            className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-2xl transition-all transform hover:-translate-y-2 cursor-pointer border-2 border-transparent hover:border-green-200"
           >
-            <div className="absolute top-4 right-4 bg-green-100 text-green-700 text-xs font-bold px-3 py-1 rounded-full">
-              COMING SOON
-            </div>
             <div className="bg-green-100 w-20 h-20 rounded-2xl flex items-center justify-center mb-6">
               <Globe className="h-10 w-10 text-green-600" />
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-4">Website Scraper</h2>
             <p className="text-gray-600 mb-6">
-              Scrape data from any website with advanced parsing capabilities.
+              AI-powered lead extractor. Search businesses by name & location, extract contacts, emails and export to Excel CSV.
             </p>
             <div className="flex items-center text-green-600 font-semibold">
-              Learn More <ArrowRight className="ml-2 h-5 w-5" />
+              Start Scraping <ArrowRight className="ml-2 h-5 w-5" />
             </div>
           </div>
 
@@ -336,6 +342,42 @@ export function Dashboard() {
                 </div>
               </form>
             )}
+          </div>
+        </div>
+      )}
+      {/* Logout Confirmation Modal */}
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl relative">
+            <button
+              onClick={() => setShowLogoutConfirm(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 bg-gray-100 hover:bg-gray-200 p-2 rounded-full transition-colors"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <div className="text-center">
+              <div className="bg-red-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-5">
+                <LogOut className="h-8 w-8 text-red-600" />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">Logout</h3>
+              <p className="text-gray-500 mb-8 leading-relaxed">
+                Are you sure you want to logout? You'll need to sign in again to access your account.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowLogoutConfirm(false)}
+                  className="flex-1 py-3 px-4 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 bg-white hover:bg-gray-50 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleLogOut}
+                  className="flex-1 py-3 px-4 rounded-xl text-sm font-semibold text-white bg-red-500 hover:bg-red-600 transition-all shadow-md"
+                >
+                  Yes, Logout
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

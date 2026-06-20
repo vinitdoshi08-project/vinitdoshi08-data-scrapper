@@ -6,6 +6,7 @@ import { Login } from './pages/Login';
 import { Signup } from './pages/Signup';
 import { Dashboard } from './pages/Dashboard';
 import { YouTubeScraper } from './pages/YouTubeScraper';
+import { WebsiteScraper } from './pages/WebsiteScraper';
 
 function App() {
   return (
@@ -28,6 +29,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <YouTubeScraper />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/website-scraper"
+            element={
+              <ProtectedRoute>
+                <WebsiteScraper />
               </ProtectedRoute>
             }
           />

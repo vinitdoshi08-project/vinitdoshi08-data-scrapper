@@ -1,12 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 
 export function Login() {
   const navigate = useNavigate();
-  const { signin, user } = useAuth();
-  const [loading, setLoading] = useState(false);
+  const { signin, user, loading } = useAuth();
+  const [formLoading, setFormLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
@@ -14,9 +14,20 @@ export function Login() {
   });
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
-  if (user) {
-    navigate('/dashboard');
-    return null;
+  // Redirect already-logged-in users safely via useEffect, not during render
+  useEffect(() => {
+    if (!loading && user) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [user, loading, navigate]);
+
+  // Show spinner while auth state is being determined
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
   }
 
   function validateForm() {
@@ -44,14 +55,14 @@ export function Login() {
     }
 
     try {
-      setLoading(true);
+      setFormLoading(true);
       setErrors({});
       await signin(formData.email, formData.password);
       navigate('/dashboard');
     } catch (err) {
       setErrors({ submit: err instanceof Error ? err.message : 'Login failed' });
     } finally {
-      setLoading(false);
+      setFormLoading(false);
     }
   }
 
@@ -123,10 +134,10 @@ export function Login() {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={formLoading}
               className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 mt-6"
             >
-              {loading ? (
+              {formLoading ? (
                 <>
                   <Loader2 className="h-5 w-5 animate-spin" />
                   <span>Signing in...</span>
