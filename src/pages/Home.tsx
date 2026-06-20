@@ -1,263 +1,509 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Globe, Map, ArrowRight, Zap, Shield, Download, Youtube } from 'lucide-react';
+import { ArrowRight, Youtube, Globe, Map, Shield, Zap, Download, Bot, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
+
+const faqs = [
+  {
+    q: 'What types of data can I scrape?',
+    a: 'YouTube videos and playlists, any public website, and map services. Each scraper is tuned to its source.',
+  },
+  {
+    q: 'Is it secure?',
+    a: 'Yes. We use industry-standard encryption for all credentials, and data is transmitted over HTTPS. Your account and exports are fully isolated.',
+  },
+  {
+    q: 'How do I create an account?',
+    a: 'Click "Get started" and fill in your name, email, and password. No credit card required.',
+  },
+  {
+    q: 'Is scraping legal?',
+    a: 'Scraping publicly available data is generally legal, but always comply with the target site\'s terms of service and applicable laws.',
+  },
+  {
+    q: 'Is this free?',
+    a: 'We offer a free forever plan with generous limits. Premium plans unlock unlimited scrapes and advanced exports.',
+  },
+];
 
 export function Home() {
+  const [openFaq, setOpenFaq] = useState<number | null>(0);
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
-      <nav className="bg-white shadow-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-20">
-            <div className="flex items-center">
-              <img src="/scrapify_logo.png" alt="Scrapify" className="h-20 w-64 object-contain" style={{maxHeight:'72px'}} />
-            </div>
-            <div className="hidden md:flex items-center space-x-8">
-              <a href="#features" className="text-gray-600 hover:text-blue-600 transition-colors">Features</a>
-              <a href="#how-it-works" className="text-gray-600 hover:text-blue-600 transition-colors">How It Works</a>
-              <a href="#faq" className="text-gray-600 hover:text-blue-600 transition-colors">FAQ</a>
-              <a href="#contact" className="text-gray-600 hover:text-blue-600 transition-colors">Contact</a>
-            </div>
-            <div className="flex items-center space-x-4">
-              <Link
-                to="/login"
-                className="text-blue-600 hover:text-blue-700 font-medium transition-colors"
-              >
-                Login
-              </Link>
-              <Link
-                to="/signup"
-                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-all hover:shadow-lg font-medium"
-              >
-                Sign Up
-              </Link>
-            </div>
+    <div className="min-h-screen bg-white" style={{ fontFamily: 'ui-sans-serif, system-ui, sans-serif' }}>
+
+      {/* ── NAV ── */}
+      <nav className="sticky top-0 z-50 bg-white border-b border-gray-100">
+        <div className="max-w-6xl mx-auto px-6 flex items-center justify-between h-14">
+          {/* Logo */}
+          <Link to="/" className="flex items-center">
+            <img src="/scrapify.png" alt="Scrapify" className="h-8 object-contain" />
+          </Link>
+
+          {/* Center links */}
+          <div className="hidden md:flex items-center gap-7 text-sm text-gray-500 font-medium">
+            <a href="#features" className="hover:text-gray-900 transition-colors">Features</a>
+            <a href="#how-it-works" className="hover:text-gray-900 transition-colors">How It Works</a>
+            <a href="#faq" className="hover:text-gray-900 transition-colors">FAQ</a>
+            <a href="#contact" className="hover:text-gray-900 transition-colors">Contact</a>
+          </div>
+
+          {/* Right CTA */}
+          <div className="flex items-center gap-3">
+            <Link to="/login" className="text-sm text-gray-600 hover:text-gray-900 font-medium transition-colors">
+              Log in
+            </Link>
+            <Link
+              to="/signup"
+              className="text-sm font-semibold text-white px-4 py-1.5 rounded-md transition-all hover:opacity-90"
+              style={{ background: 'linear-gradient(135deg, #5B4FE8 0%, #7C6FEF 100%)' }}
+            >
+              Get started
+            </Link>
           </div>
         </div>
       </nav>
 
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <div className="text-center">
-          <h1 className="text-5xl md:text-6xl font-extrabold text-gray-900 mb-6">
-            All-in-One Data Scraper
-            <span className="block text-blue-600 mt-2">Platform</span>
+      {/* ── HERO ── */}
+      <section
+        className="relative overflow-hidden"
+        style={{
+          background: 'radial-gradient(ellipse 80% 50% at 50% -10%, oklch(0.96 0.05 270 / 0.55), transparent 60%), linear-gradient(180deg, oklch(0.985 0.005 250) 0%, #fff 100%)',
+        }}
+      >
+        <div className="bg-grid absolute inset-0 pointer-events-none" />
+        <div className="relative max-w-6xl mx-auto px-6 pt-24 pb-28 text-center">
+          {/* Badge */}
+          <div className="inline-flex items-center gap-2 bg-white border border-gray-200 rounded-full px-3 py-1 text-xs text-gray-500 font-medium mb-8 shadow-sm">
+            <Bot className="w-3.5 h-3.5 text-indigo-500" />
+            AI-powered data extraction · Now with Gemini 2.5
+          </div>
+
+          <h1 className="text-5xl md:text-6xl font-extrabold text-gray-900 leading-[1.08] mb-4 tracking-tight">
+            All-in-one data scraper
+            <br />
+            <span style={{ color: '#5B4FE8' }}>for modern teams.</span>
           </h1>
-          <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-            Extract data from YouTube, websites, and maps with ease. Secure, fast, and powerful data scraping for everyone.
+          <p className="text-lg text-gray-500 max-w-xl mx-auto mb-10 leading-relaxed">
+            Extract structured data from YouTube, websites, and maps in seconds. Secure, fast, and beautifully simple.
           </p>
-          <Link
-            to="/login"
-            className="inline-flex items-center bg-blue-600 text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-blue-700 transition-all hover:shadow-xl transform hover:-translate-y-1"
-          >
-            Get Started <ArrowRight className="ml-2 h-5 w-5" />
-          </Link>
+
+          <div className="flex items-center justify-center gap-3 flex-wrap">
+            <Link
+              to="/signup"
+              className="inline-flex items-center gap-2 text-white font-semibold px-6 py-3 rounded-lg text-sm transition-all hover:opacity-90 hover:shadow-lg"
+              style={{ background: 'linear-gradient(135deg, #5B4FE8 0%, #7C6FEF 100%)' }}
+            >
+              Get started free <ArrowRight className="w-4 h-4" />
+            </Link>
+            <a
+              href="#how-it-works"
+              className="inline-flex items-center gap-2 text-gray-700 font-semibold px-6 py-3 rounded-lg text-sm bg-white border border-gray-200 hover:bg-gray-50 transition-all"
+            >
+              See how it works
+            </a>
+          </div>
+          <p className="mt-4 text-xs text-gray-400">No credit card required · Free forever plan</p>
         </div>
+      </section>
 
-        <div className="mt-20 grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div className="bg-white rounded-xl p-8 shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-2">
-            <div className="bg-red-100 w-16 h-16 rounded-full flex items-center justify-center mb-6">
-              <Youtube className="h-8 w-8 text-red-600" />
-            </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-4">YouTube Scraper</h3>
-            <p className="text-gray-600">
-              Extract video data, channel information, and statistics from YouTube videos and playlists.
-            </p>
-          </div>
-
-          <div className="bg-white rounded-xl p-8 shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-2">
-            <div className="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mb-6">
-              <Globe className="h-8 w-8 text-green-600" />
-            </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-4">Website Scraper</h3>
-            <p className="text-gray-600">
-              Scrape data from any website with advanced parsing and extraction capabilities.
-            </p>
-          </div>
-
-          <div className="bg-white rounded-xl p-8 shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-2">
-            <div className="bg-purple-100 w-16 h-16 rounded-full flex items-center justify-center mb-6">
-              <Map className="h-8 w-8 text-purple-600" />
-            </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-4">Map Scraper</h3>
-            <p className="text-gray-600">
-              Extract location data, business information, and reviews from map services.
-            </p>
+      {/* ── TRUSTED BY ── */}
+      <section className="border-y border-gray-100 bg-white py-10">
+        <div className="max-w-4xl mx-auto px-6 text-center">
+          <p className="text-xs font-semibold tracking-widest text-gray-400 uppercase mb-7">
+            Trusted by data teams at fast-moving companies
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-10">
+            {['Acme', 'Globex', 'Initech', 'Umbrella', 'Stark', 'Wayne'].map(name => (
+              <span key={name} className="text-gray-300 font-bold text-lg tracking-tight select-none">{name}</span>
+            ))}
           </div>
         </div>
       </section>
 
-      <section id="how-it-works" className="bg-white py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">How It Works</h2>
-            <p className="text-xl text-gray-600">Simple and straightforward process</p>
+      {/* ── SCRAPERS ── */}
+      <section id="scrapers" className="py-24 bg-white">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="text-center mb-14">
+            <p className="text-xs font-semibold tracking-widest text-indigo-500 uppercase mb-3">Scrapers</p>
+            <h2 className="text-4xl font-extrabold text-gray-900 mb-3">One platform. Every source.</h2>
+            <p className="text-gray-500 text-base">Pick a scraper, paste a URL, and ship clean data in seconds.</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            <div className="text-center">
-              <div className="bg-gradient-to-br from-blue-500 to-blue-600 w-16 h-16 rounded-full flex items-center justify-center text-white text-2xl font-bold mx-auto mb-6 shadow-lg">
-                1
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-3">Sign Up or Login</h3>
-              <p className="text-gray-600">Create account with email and password</p>
-            </div>
-
-            <div className="text-center">
-              <div className="bg-gradient-to-br from-green-500 to-green-600 w-16 h-16 rounded-full flex items-center justify-center text-white text-2xl font-bold mx-auto mb-6 shadow-lg">
-                2
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-3">Choose Scraper</h3>
-              <p className="text-gray-600">Select from YouTube, Website, or Map scraper</p>
-            </div>
-
-            <div className="text-center">
-              <div className="bg-gradient-to-br from-purple-500 to-purple-600 w-16 h-16 rounded-full flex items-center justify-center text-white text-2xl font-bold mx-auto mb-6 shadow-lg">
-                3
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-3">Enter Input</h3>
-              <p className="text-gray-600">Provide URL and configure export options</p>
-            </div>
-
-            <div className="text-center">
-              <div className="bg-gradient-to-br from-red-500 to-red-600 w-16 h-16 rounded-full flex items-center justify-center text-white text-2xl font-bold mx-auto mb-6 shadow-lg">
-                4
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-3">Download Data</h3>
-              <p className="text-gray-600">Get your data in Excel, PDF, or JSON format</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section id="features" className="py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">Features</h2>
-            <p className="text-xl text-gray-600">Everything you need for data extraction</p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="bg-white rounded-xl p-8 shadow-lg">
-              <Shield className="h-12 w-12 text-blue-600 mb-4" />
-              <h3 className="text-xl font-bold text-gray-900 mb-3">Secure Authentication</h3>
-              <p className="text-gray-600">Email and password authentication with encrypted storage</p>
-            </div>
-
-            <div className="bg-white rounded-xl p-8 shadow-lg">
-              <Zap className="h-12 w-12 text-yellow-500 mb-4" />
-              <h3 className="text-xl font-bold text-gray-900 mb-3">Fast Scraping</h3>
-              <p className="text-gray-600">Optimized algorithms for quick data extraction and processing</p>
-            </div>
-
-            <div className="bg-white rounded-xl p-8 shadow-lg">
-              <Download className="h-12 w-12 text-green-600 mb-4" />
-              <h3 className="text-xl font-bold text-gray-900 mb-3">Clean Data Output</h3>
-              <p className="text-gray-600">Export data in Excel, PDF, or JSON formats ready for analysis</p>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {[
+              {
+                icon: <Youtube className="w-5 h-5 text-red-500" />,
+                bg: 'bg-red-50',
+                title: 'YouTube Scraper',
+                desc: 'Extract video data, channel info, and statistics from YouTube videos and playlists.',
+                link: '/login',
+              },
+              {
+                icon: <Globe className="w-5 h-5 text-emerald-500" />,
+                bg: 'bg-emerald-50',
+                title: 'Website Scraper',
+                desc: 'Scrape data from any website with advanced parsing and AI-powered extraction.',
+                link: '/login',
+              },
+              {
+                icon: <Map className="w-5 h-5 text-indigo-500" />,
+                bg: 'bg-indigo-50',
+                title: 'Map Scraper',
+                desc: 'Extract location data, business info, and reviews from map services.',
+                link: '/login',
+              },
+            ].map(item => (
+              <Link
+                key={item.title}
+                to={item.link}
+                className="group rounded-2xl border border-gray-100 p-7 bg-white hover:shadow-md transition-all hover:border-indigo-100"
+                style={{ boxShadow: '0 1px 4px 0 oklch(0.21 0.05 264 / 0.05)' }}
+              >
+                <div className={`w-10 h-10 rounded-xl ${item.bg} flex items-center justify-center mb-5`}>
+                  {item.icon}
+                </div>
+                <h3 className="font-bold text-gray-900 mb-2">{item.title}</h3>
+                <p className="text-sm text-gray-500 leading-relaxed">{item.desc}</p>
+              </Link>
+            ))}
           </div>
         </div>
       </section>
 
-      <section id="faq" className="bg-white py-20">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">FAQ</h2>
-            <p className="text-xl text-gray-600">Frequently Asked Questions</p>
+      {/* ── HOW IT WORKS ── */}
+      <section id="how-it-works" className="py-24" style={{ background: 'oklch(0.985 0.005 250)' }}>
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="text-center mb-14">
+            <p className="text-xs font-semibold tracking-widest text-indigo-500 uppercase mb-3">How It Works</p>
+            <h2 className="text-4xl font-extrabold text-gray-900 mb-3">From URL to insight in four steps</h2>
+            <p className="text-gray-500 text-base">A clean workflow built around your data.</p>
           </div>
 
-          <div className="space-y-6">
-            <details className="bg-gray-50 rounded-lg p-6 group">
-              <summary className="font-bold text-lg text-gray-900 cursor-pointer flex items-center justify-between">
-                What data can I scrape?
-                <span className="ml-4">+</span>
-              </summary>
-              <p className="mt-4 text-gray-600">
-                You can scrape YouTube video data, channel information, website content, and map location data. Each scraper is optimized for its specific data source.
-              </p>
-            </details>
-
-            <details className="bg-gray-50 rounded-lg p-6 group">
-              <summary className="font-bold text-lg text-gray-900 cursor-pointer flex items-center justify-between">
-                Is it secure?
-                <span className="ml-4">+</span>
-              </summary>
-              <p className="mt-4 text-gray-600">
-                Yes! We use SHA-256 password encryption and all data is transmitted over secure HTTPS connections. Your information is protected and never shared.
-              </p>
-            </details>
-
-            <details className="bg-gray-50 rounded-lg p-6 group">
-              <summary className="font-bold text-lg text-gray-900 cursor-pointer flex items-center justify-between">
-                How do I create an account?
-                <span className="ml-4">+</span>
-              </summary>
-              <p className="mt-4 text-gray-600">
-                Click on "Sign Up" and enter your full name, email address, and password. Your account will be created instantly and you can start scraping right away.
-              </p>
-            </details>
-
-            <details className="bg-gray-50 rounded-lg p-6 group">
-              <summary className="font-bold text-lg text-gray-900 cursor-pointer flex items-center justify-between">
-                Is scraping legal?
-                <span className="ml-4">+</span>
-              </summary>
-              <p className="mt-4 text-gray-600">
-                Scraping publicly available data is generally legal, but you should always comply with website terms of service and applicable laws in your jurisdiction.
-              </p>
-            </details>
-
-            <details className="bg-gray-50 rounded-lg p-6 group">
-              <summary className="font-bold text-lg text-gray-900 cursor-pointer flex items-center justify-between">
-                Is this free?
-                <span className="ml-4">+</span>
-              </summary>
-              <p className="mt-4 text-gray-600">
-                We offer a free tier with basic features. Premium plans are available for advanced features and higher usage limits.
-              </p>
-            </details>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[
+              { n: '01', title: 'Sign up', desc: 'Create your free account in seconds. No credit card needed.' },
+              { n: '02', title: 'Choose scraper', desc: 'Pick from YouTube, Website, or Map scraper.' },
+              { n: '03', title: 'Enter input', desc: 'Paste a URL and configure output options.' },
+              { n: '04', title: 'Download data', desc: 'Export to Excel, PDF, or JSON.' },
+            ].map(step => (
+              <div
+                key={step.n}
+                className="rounded-2xl border border-gray-100 bg-white p-7"
+                style={{ boxShadow: '0 1px 4px 0 oklch(0.21 0.05 264 / 0.05)' }}
+              >
+                <p className="text-xs font-bold text-indigo-400 mb-3 tracking-wider">{step.n}</p>
+                <h3 className="font-bold text-gray-900 mb-2">{step.title}</h3>
+                <p className="text-sm text-gray-500 leading-relaxed">{step.desc}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
-      <footer id="contact" className="bg-gray-900 text-white py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+      {/* ── FEATURES ── */}
+      <section id="features" className="py-24 bg-white">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="text-center mb-14">
+            <p className="text-xs font-semibold tracking-widest text-indigo-500 uppercase mb-3">Features</p>
+            <h2 className="text-4xl font-extrabold text-gray-900 mb-3">Everything you need for data extraction</h2>
+            <p className="text-gray-500 text-base">Built for analysts, marketers, and engineers.</p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[
+              { icon: <Shield className="w-5 h-5 text-indigo-500" />, bg: 'bg-indigo-50', title: 'Secure authentication', desc: 'Email + password authentication with industry-standard security.' },
+              { icon: <Zap className="w-5 h-5 text-yellow-500" />, bg: 'bg-yellow-50', title: 'Fast scraping', desc: 'Optimized algorithms for quick data extraction at scale.' },
+              { icon: <Download className="w-5 h-5 text-emerald-500" />, bg: 'bg-emerald-50', title: 'Clean exports', desc: 'Export to Excel, PDF, or JSON ready for analysis.' },
+              { icon: <Bot className="w-5 h-5 text-indigo-500" />, bg: 'bg-indigo-50', title: 'AI-powered', desc: 'Gemini-powered extraction adapts to any page structure.' },
+              { icon: <Globe className="w-5 h-5 text-blue-500" />, bg: 'bg-blue-50', title: 'Any website', desc: 'Crawl, parse, and structure data from any public URL.' },
+              { icon: <Map className="w-5 h-5 text-purple-500" />, bg: 'bg-purple-50', title: 'Geo-aware', desc: 'Pull business info, reviews, and locations from maps.' },
+            ].map(f => (
+              <div
+                key={f.title}
+                className="rounded-2xl border border-gray-100 bg-white p-7"
+                style={{ boxShadow: '0 1px 4px 0 oklch(0.21 0.05 264 / 0.05)' }}
+              >
+                <div className={`w-10 h-10 rounded-xl ${f.bg} flex items-center justify-center mb-5`}>
+                  {f.icon}
+                </div>
+                <h3 className="font-bold text-gray-900 mb-2">{f.title}</h3>
+                <p className="text-sm text-gray-500 leading-relaxed">{f.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── PRODUCT PREVIEW ── */}
+      <section
+        className="py-24"
+        style={{
+          background: 'radial-gradient(ellipse 80% 50% at 50% -10%, oklch(96% .05 270 / .6), transparent 60%), linear-gradient(180deg, oklch(99% .005 250) 0%, oklch(100% 0 0) 100%)',
+        }}
+      >
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <p className="text-xs font-semibold tracking-widest uppercase mb-3" style={{ color: 'oklch(54% .22 277)' }}>Product</p>
+          <h2 className="text-4xl font-extrabold mb-3" style={{ color: 'oklch(0.21 0.05 264)', letterSpacing: '-0.025em' }}>
+            A dashboard worth opening every day
+          </h2>
+          <p className="text-base mb-14" style={{ color: 'oklch(0.52 0.03 257)' }}>Clean, fast, and built for focus.</p>
+
+          {/* Outer glow wrapper — relative so the blur pseudo sits behind the card */}
+          <div className="relative mt-14 max-w-3xl mx-auto">
+
+            {/* Brand gradient glow blob — absolute, behind the card */}
+            <div
+              className="absolute inset-x-8 -top-8 -bottom-8 rounded-3xl"
+              style={{
+                background: 'linear-gradient(135deg, oklch(54% .22 277) 0%, oklch(66% .21 290) 100%)',
+                opacity: 0.2,
+                filter: 'blur(64px)',
+                borderRadius: '1.5rem',
+                zIndex: 0,
+              }}
+            />
+
+            {/* Browser chrome card */}
+            <div
+              className="relative overflow-hidden text-left"
+              style={{
+                zIndex: 1,
+                borderRadius: '1rem',
+                border: '1px solid oklch(0.93 0.01 255)',
+                boxShadow: '0 1px 3px 0 oklch(0.21 0.05 264 / 0.06), 0 1px 2px -1px oklch(0.21 0.05 264 / 0.04)',
+                background: '#fff',
+              }}
+            >
+              {/* Window title bar */}
+              <div
+                className="flex items-center gap-1.5 px-4 py-3"
+                style={{ background: 'oklch(0.985 0.005 250)', borderBottom: '1px solid oklch(0.93 0.01 255)' }}
+              >
+                <span className="w-2.5 h-2.5 rounded-full" style={{ background: '#FF5F57' }} />
+                <span className="w-2.5 h-2.5 rounded-full" style={{ background: '#FEBC2E' }} />
+                <span className="w-2.5 h-2.5 rounded-full" style={{ background: '#28C840' }} />
+              </div>
+
+              {/* Dashboard layout */}
+              <div className="flex" style={{ minHeight: '240px' }}>
+
+                {/* Sidebar */}
+                <div
+                  className="shrink-0 flex flex-col gap-0.5 p-3"
+                  style={{
+                    width: '130px',
+                    borderRight: '1px solid oklch(0.93 0.01 255)',
+                    background: 'oklch(0.99 0.005 250)',
+                  }}
+                >
+                  {/* Active item — exact --gradient-brand */}
+                  <div
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs font-semibold text-white"
+                    style={{ background: 'linear-gradient(135deg, oklch(54% .22 277) 0%, oklch(66% .21 290) 100%)' }}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: 'rgba(255,255,255,0.6)' }} />
+                    Dashboard
+                  </div>
+                  {[
+                    { label: 'YouTube',  dot: '#EF4444' },
+                    { label: 'Website',  dot: '#10B981' },
+                    { label: 'Profile',  dot: 'oklch(0.72 0.01 257)' },
+                    { label: 'Settings', dot: 'oklch(0.72 0.01 257)' },
+                  ].map(item => (
+                    <div
+                      key={item.label}
+                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs cursor-default"
+                      style={{ color: 'oklch(0.52 0.03 257)' }}
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: item.dot }} />
+                      {item.label}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Main content */}
+                <div className="flex-1 p-5" style={{ background: '#fff' }}>
+
+                  {/* KPI row */}
+                  <div className="grid grid-cols-4 gap-2.5 mb-4">
+                    {[
+                      { label: 'Total scrapes', val: '12,438', sub: '+24%',  subStyle: { color: '#10B981' } },
+                      { label: 'Active jobs',   val: '8',      sub: 'live',  subStyle: { color: '#3B82F6' } },
+                      { label: 'Exports',       val: '3,221',  sub: '+12%',  subStyle: { color: '#10B981' } },
+                      { label: 'Success rate',  val: '99.8%',  sub: 'stable',subStyle: { color: '#10B981' } },
+                    ].map(s => (
+                      <div
+                        key={s.label}
+                        className="rounded-xl p-3"
+                        style={{ border: '1px solid oklch(0.93 0.01 255)', background: '#fff' }}
+                      >
+                        <p className="text-[9px] font-medium mb-1.5" style={{ color: 'oklch(0.52 0.03 257)' }}>{s.label}</p>
+                        <p className="text-base font-bold" style={{ color: 'oklch(0.21 0.05 264)', letterSpacing: '-0.02em' }}>{s.val}</p>
+                        <p className="text-[9px] font-semibold mt-0.5" style={s.subStyle}>{s.sub}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Activity chart area */}
+                  <div
+                    className="rounded-xl flex items-center justify-center overflow-hidden"
+                    style={{
+                      height: '120px',
+                      border: '1px solid oklch(0.93 0.01 255)',
+                      background: 'oklch(0.985 0.005 250)',
+                    }}
+                  >
+                    <svg width="92%" height="78%" viewBox="0 0 320 80" preserveAspectRatio="none">
+                      <defs>
+                        <linearGradient id="barGrad2" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="oklch(54% .22 277)" stopOpacity="0.85" />
+                          <stop offset="100%" stopColor="oklch(66% .21 290)" stopOpacity="0.45" />
+                        </linearGradient>
+                      </defs>
+                      {[20, 40, 60].map(y => (
+                        <line key={y} x1="0" y1={y} x2="320" y2={y} stroke="oklch(0.93 0.01 255)" strokeWidth="0.8" />
+                      ))}
+                      {[
+                        { x: 8,   h: 48 }, { x: 40,  h: 32 }, { x: 72,  h: 62 }, { x: 104, h: 38 },
+                        { x: 136, h: 52 }, { x: 168, h: 26 }, { x: 200, h: 68 }, { x: 232, h: 42 },
+                        { x: 264, h: 57 }, { x: 296, h: 72 },
+                      ].map((b, i) => (
+                        <rect key={i} x={b.x} y={80 - b.h} width="20" height={b.h} rx="3" fill="url(#barGrad2)" />
+                      ))}
+                    </svg>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      {/* ── TESTIMONIALS ── */}
+      <section className="py-24 bg-white">
+        <div className="max-w-6xl mx-auto px-6">
+          <h2 className="text-3xl font-extrabold text-gray-900 text-center mb-12">What our customers say</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {[
+              { quote: '"Scrapify replaced three internal tools. Our team ships data pipelines in hours, not weeks."', name: 'Sarah Chen', role: 'Head of Data, Northwind', initials: 'SC' },
+              { quote: '"The cleanest scraping UX I\'ve ever used. Feels like Linear, works like Stripe."', name: 'Marcus Reyes', role: 'Founder, Aperture', initials: 'MR' },
+              { quote: '"Reliable, fast, and the exports just work. Our analysts love it."', name: 'Priya Nair', role: 'Analytics Lead, Tesla', initials: 'PN' },
+            ].map(t => (
+              <div key={t.name} className="rounded-2xl border border-gray-100 p-7 bg-white" style={{ boxShadow: '0 1px 4px 0 oklch(0.21 0.05 264 / 0.05)' }}>
+                <p className="text-sm text-gray-700 leading-relaxed mb-6">{t.quote}</p>
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ background: 'linear-gradient(135deg,#5B4FE8,#7C6FEF)' }}>
+                    {t.initials}
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">{t.name}</p>
+                    <p className="text-xs text-gray-400">{t.role}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── FAQ ── */}
+      <section id="faq" className="py-24" style={{ background: 'oklch(0.985 0.005 250)' }}>
+        <div className="max-w-2xl mx-auto px-6">
+          <div className="text-center mb-12">
+            <p className="text-xs font-semibold tracking-widest text-indigo-500 uppercase mb-3">FAQ</p>
+            <h2 className="text-4xl font-extrabold text-gray-900">Frequently asked questions</h2>
+          </div>
+          <div className="space-y-2">
+            {faqs.map((item, i) => (
+              <div key={i} className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+                <button
+                  className="w-full flex items-center justify-between px-5 py-4 text-left"
+                  onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                >
+                  <span className="text-sm font-semibold text-gray-900">{item.q}</span>
+                  {openFaq === i
+                    ? <ChevronUp className="w-4 h-4 text-gray-400 shrink-0" />
+                    : <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" />}
+                </button>
+                {openFaq === i && (
+                  <div className="px-5 pb-5 text-sm text-gray-500 leading-relaxed border-t border-gray-100 pt-3">
+                    {item.a}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── CTA BANNER ── */}
+      <section className="py-16 px-6">
+        <div
+          className="max-w-4xl mx-auto rounded-2xl px-10 py-14 text-center text-white"
+          style={{ background: 'linear-gradient(135deg, #5B4FE8 0%, #7C6FEF 100%)' }}
+        >
+          <h2 className="text-3xl font-extrabold mb-3">Ready to extract data the easy way?</h2>
+          <p className="text-indigo-200 mb-8 text-base">Join thousands of teams already scraping smarter with Scrapify.</p>
+          <div className="flex items-center justify-center gap-3 flex-wrap">
+            <Link
+              to="/signup"
+              className="inline-flex items-center gap-2 bg-white text-indigo-700 font-semibold px-6 py-2.5 rounded-lg text-sm hover:bg-indigo-50 transition-all"
+            >
+              Start free <ArrowRight className="w-4 h-4" />
+            </Link>
+            <Link
+              to="/login"
+              className="inline-flex items-center gap-2 border border-white/40 text-white font-semibold px-6 py-2.5 rounded-lg text-sm hover:bg-white/10 transition-all"
+            >
+              Sign in
+            </Link>
+          </div>
+          <div className="flex items-center justify-center gap-6 mt-6 text-xs text-indigo-200">
+            <span className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5" /> Free forever plan</span>
+            <span className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5" /> No credit card</span>
+            <span className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5" /> Cancel anytime</span>
+          </div>
+        </div>
+      </section>
+
+      {/* ── FOOTER ── */}
+      <footer id="contact" className="border-t border-gray-100 bg-white py-14">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-10 mb-10">
+            {/* Brand */}
             <div>
-              <div className="flex items-center mb-4">
-                <img src="/scrapify_logo.png" alt="Scrapify" className="h-20 w-64 object-contain brightness-0 invert" />
+              <div className="flex items-center gap-2 mb-4">
+                <img src="/scrapify.png" alt="Scrapify" className="h-7 object-contain" />
               </div>
-              <p className="text-gray-400">
-                Professional data scraping platform for modern users.
+              <p className="text-sm text-gray-400 leading-relaxed max-w-xs">
+                The professional data extraction platform. Built for modern teams who move fast.
               </p>
             </div>
 
+            {/* Product */}
             <div>
-              <h3 className="font-bold mb-4">Product</h3>
-              <ul className="space-y-2 text-gray-400">
-                <li><a href="#features" className="hover:text-white transition-colors">Features</a></li>
-                <li><a href="#how-it-works" className="hover:text-white transition-colors">How It Works</a></li>
-                <li><a href="#faq" className="hover:text-white transition-colors">FAQ</a></li>
+              <h4 className="text-sm font-semibold text-gray-900 mb-4">Product</h4>
+              <ul className="space-y-2.5 text-sm text-gray-400">
+                <li><a href="#features" className="hover:text-gray-700 transition-colors">Features</a></li>
+                <li><a href="#how-it-works" className="hover:text-gray-700 transition-colors">How it works</a></li>
+                <li><a href="#faq" className="hover:text-gray-700 transition-colors">FAQ</a></li>
               </ul>
             </div>
 
+            {/* Company */}
             <div>
-              <h3 className="font-bold mb-4">Company</h3>
-              <ul className="space-y-2 text-gray-400">
-                <li><a href="#" className="hover:text-white transition-colors">About</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Privacy Policy</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Terms & Conditions</a></li>
-              </ul>
-            </div>
-
-            <div>
-              <h3 className="font-bold mb-4">Contact</h3>
-              <ul className="space-y-2 text-gray-400">
-                <li>support@scrapify.com</li>
-                <li>Community Forum</li>
+              <h4 className="text-sm font-semibold text-gray-900 mb-4">Company</h4>
+              <ul className="space-y-2.5 text-sm text-gray-400">
+                <li><a href="#" className="hover:text-gray-700 transition-colors">About</a></li>
+                <li><a href="#" className="hover:text-gray-700 transition-colors">Privacy</a></li>
+                <li><a href="mailto:support@scrapify.com" className="hover:text-gray-700 transition-colors">support@scrapify.com</a></li>
               </ul>
             </div>
           </div>
 
-          <div className="mt-8 pt-8 border-t border-gray-800 text-center text-gray-400">
-            <p>2025 Scrapify. All rights reserved.</p>
+          <div className="pt-8 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-2">
+            <p className="text-xs text-gray-400">© 2026 Scrapify. All rights reserved.</p>
+            <p className="text-xs text-gray-400">Crafted for data teams.</p>
           </div>
         </div>
       </footer>

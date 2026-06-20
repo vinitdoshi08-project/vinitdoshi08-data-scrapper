@@ -113,7 +113,7 @@ export function YouTubeScraper() {
             </button>
 
             <div className="flex items-center space-x-2">
-              <img src="/scrapify_logo.png" alt="Scrapify" className="h-20 w-60 object-contain rounded-xl" />
+              <img src="/scrapify.png" alt="Scrapify" className="h-9 object-contain" />
             </div>
 
             <button

@@ -1,3 +1,64 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  --radius: 0.75rem;
+  --background: oklch(1 0 0);
+  --surface: oklch(0.985 0.005 250);
+  --surface-elevated: oklch(1 0 0);
+  --foreground: oklch(0.21 0.05 264);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.21 0.05 264);
+  --primary: oklch(0.54 0.22 277);
+  --primary-foreground: oklch(0.99 0 0);
+  --primary-glow: oklch(0.66 0.21 290);
+  --secondary: oklch(0.97 0.01 255);
+  --secondary-foreground: oklch(0.21 0.05 264);
+  --muted: oklch(0.97 0.008 255);
+  --muted-foreground: oklch(0.52 0.03 257);
+  --accent: oklch(0.96 0.02 270);
+  --accent-foreground: oklch(0.32 0.13 277);
+  --destructive: oklch(0.6 0.22 27);
+  --border: oklch(0.93 0.01 255);
+  --input: oklch(0.93 0.01 255);
+  --ring: oklch(0.54 0.22 277);
+  --gradient-brand: linear-gradient(135deg, oklch(0.54 0.22 277) 0%, oklch(0.66 0.21 290) 100%);
+  --shadow-sm: 0 1px 3px 0 oklch(0.21 0.05 264 / 0.06), 0 1px 2px -1px oklch(0.21 0.05 264 / 0.04);
+  --shadow-md: 0 4px 12px -2px oklch(0.21 0.05 264 / 0.08), 0 2px 4px -2px oklch(0.21 0.05 264 / 0.04);
+  --shadow-lg: 0 12px 32px -8px oklch(0.21 0.05 264 / 0.12), 0 4px 8px -4px oklch(0.21 0.05 264 / 0.06);
+}
+
+@layer base {
+  * { border-color: oklch(0.93 0.01 255); }
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  body {
+    background-color: #fff;
+    color: oklch(0.21 0.05 264);
+    font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
+    letter-spacing: -0.011em;
+  }
+  h1, h2, h3, h4 {
+    letter-spacing: -0.025em;
+  }
+}
+
+.bg-grid {
+  background-image:
+    linear-gradient(to right, oklch(0.21 0.05 264 / 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, oklch(0.21 0.05 264 / 0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+.btn-primary {
+  background: var(--gradient-brand);
+  color: #fff;
+  font-weight: 600;
+  border-radius: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  transition: opacity 0.15s, box-shadow 0.15s;
+}
+.btn-primary:hover { opacity: 0.9; box-shadow: 0 4px 16px oklch(0.54 0.22 277 / 0.35); }
