@@ -250,6 +250,7 @@ async def scrape_youtube(
     file_name:   str = Form(...),
     file_format: str = Form(...),
     token:       str = Form(default=""),
+    api_key:     str = Form(default=""),   # direct key from browser localStorage
 ):
     if not validate_file_name(file_name):
         raise HTTPException(status_code=400, detail="Invalid file name.")
@@ -258,10 +259,11 @@ async def scrape_youtube(
     if file_format not in ("xlsx", "pdf", "json"):
         raise HTTPException(status_code=400, detail="Unsupported format. Use xlsx, pdf or json.")
 
-    # Resolve API key: user's stored key → env fallback
-    api_key = DEFAULT_API_KEY
+    # Key priority: 1) direct from browser localStorage  2) user's DB-stored key  3) env fallback
+    resolved_key = api_key.strip() if api_key and api_key.strip() else DEFAULT_API_KEY
     uid = None
-    if token:
+    if not resolved_key and token:
+        # Only hit the DB if no direct key was provided
         try:
             uid = decode_token(token)
             conn = sqlite3.connect(DATABASE_URL)
@@ -271,11 +273,11 @@ async def scrape_youtube(
             row = c.fetchone()
             conn.close()
             if row:
-                api_key = decrypt_api_key(row["encrypted_key"])
+                resolved_key = decrypt_api_key(row["encrypted_key"])
         except Exception:
-            pass  # fall back to env key
+            pass
 
-    if not api_key:
+    if not resolved_key:
         raise HTTPException(
             status_code=400,
             detail="No YouTube API key configured. Please add your API key in the scraper page."
@@ -287,9 +289,9 @@ async def scrape_youtube(
             raise HTTPException(status_code=400, detail="Could not extract video/playlist ID from URL.")
 
         if url_type == "playlist":
-            video_data = fetch_playlist_videos(id_value, api_key)
+            video_data = fetch_playlist_videos(id_value, resolved_key)
         else:
-            detail = fetch_video_details(id_value, api_key)
+            detail = fetch_video_details(id_value, resolved_key)
             video_data = [detail] if detail else []
 
         if not video_data:
@@ -320,7 +322,6 @@ async def scrape_youtube(
         raise
     except HttpError as e:
         if _is_quota_error(e):
-            # Mark quota exceeded so frontend unlocks the key field
             if uid:
                 try:
                     conn2 = sqlite3.connect(DATABASE_URL)

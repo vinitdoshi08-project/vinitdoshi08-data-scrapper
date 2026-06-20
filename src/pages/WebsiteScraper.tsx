@@ -487,7 +487,7 @@ export function WebsiteScraper() {
               <ArrowLeft className="h-5 w-5" />
               <span>Back to Dashboard</span>
             </button>
-            <img src="/scrapify.png" alt="Scrapify" className="h-9 object-contain" />
+            <img src="/scrapify.png" alt="Scrapify" className="h-12 w-auto object-contain" />
             <button onClick={() => signOut().then(() => navigate('/'))} className="text-gray-600 hover:text-red-600 transition-colors font-medium">
               Logout
             </button>

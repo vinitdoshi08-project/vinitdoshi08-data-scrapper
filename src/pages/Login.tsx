@@ -56,7 +56,7 @@ export function Login() {
       <div className="flex flex-col w-full md:w-1/2 px-8 md:px-16 py-10">
         {/* Logo */}
         <Link to="/" className="flex items-center mb-16">
-          <img src="/scrapify.png" alt="Scrapify" className="h-8 object-contain" />
+          <img src="/scrapify.png" alt="Scrapify" className="h-12 w-auto object-contain" />
         </Link>
 
         <div className="max-w-sm w-full mx-auto flex-1 flex flex-col justify-center">

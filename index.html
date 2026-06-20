@@ -2,20 +2,43 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/scrapify_logo.png" />
+    <link rel="icon" type="image/png" href="/scrapify.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Scrapify Data Scrapper</title>
-    <meta
-      property="og:image"
-      content="https://bolt.new/static/og_default.png"
-    />
+    <title>Scrapify — All-in-One Data Scraper</title>
+    <meta property="og:image" content="https://bolt.new/static/og_default.png" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta
-      name="twitter:image"
-      content="https://bolt.new/static/og_default.png"
-    />
+    <meta name="twitter:image" content="https://bolt.new/static/og_default.png" />
+    <style>
+      #app-loader {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #fff;
+        z-index: 9999;
+        transition: opacity 0.3s ease;
+      }
+      #app-loader.hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+      #app-loader img {
+        width: 160px;
+        height: auto;
+        animation: logoPulse 1.2s ease-in-out infinite;
+      }
+      @keyframes logoPulse {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50%       { opacity: 0.45; transform: scale(0.96); }
+      }
+    </style>
   </head>
   <body>
+    <!-- Logo loader — shown immediately, hidden once React mounts -->
+    <div id="app-loader">
+      <img src="/scrapify.png" alt="Scrapify" />
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

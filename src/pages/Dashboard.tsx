@@ -95,10 +95,10 @@ export function Dashboard() {
       {/* ── SIDEBAR ── */}
       <aside className={`flex flex-col bg-white border-r border-gray-100 transition-all duration-200 ${sidebarCollapsed ? 'w-16' : 'w-56'} shrink-0`}>
         {/* Logo */}
-        <div className="flex items-center gap-2.5 px-4 py-3 border-b border-gray-100 h-14">
+        <div className="flex items-center px-4 py-3 border-b border-gray-100 h-14">
           {sidebarCollapsed
-            ? <img src="/scrapify.png" alt="Scrapify" className="h-6 w-6 object-contain shrink-0" />
-            : <img src="/scrapify.png" alt="Scrapify" className="h-7 object-contain" />
+            ? <img src="/scrapify.png" alt="Scrapify" className="h-8 w-8 object-contain shrink-0" />
+            : <img src="/scrapify.png" alt="Scrapify" className="h-11 w-auto object-contain" />
           }
         </div>
 

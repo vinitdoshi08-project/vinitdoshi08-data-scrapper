@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Youtube, Globe, Map, Shield, Zap, Download, Bot, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowRight, Youtube, Globe, Map, Shield, Zap, Download, Bot, CheckCircle2, ChevronDown, ChevronUp, Check } from 'lucide-react';
 
 const faqs = [
   {
@@ -27,22 +27,24 @@ const faqs = [
 
 export function Home() {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
+  const [yearly, setYearly] = useState(false);
 
   return (
     <div className="min-h-screen bg-white" style={{ fontFamily: 'ui-sans-serif, system-ui, sans-serif' }}>
 
       {/* ── NAV ── */}
       <nav className="sticky top-0 z-50 bg-white border-b border-gray-100">
-        <div className="max-w-6xl mx-auto px-6 flex items-center justify-between h-14">
+        <div className="max-w-6xl mx-auto px-6 flex items-center justify-between h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center">
-            <img src="/scrapify.png" alt="Scrapify" className="h-8 object-contain" />
+            <img src="/scrapify.png" alt="Scrapify" className="h-16 w-auto object-contain" />
           </Link>
 
           {/* Center links */}
           <div className="hidden md:flex items-center gap-7 text-sm text-gray-500 font-medium">
             <a href="#features" className="hover:text-gray-900 transition-colors">Features</a>
             <a href="#how-it-works" className="hover:text-gray-900 transition-colors">How It Works</a>
+            <a href="#pricing" className="hover:text-gray-900 transition-colors">Pricing</a>
             <a href="#faq" className="hover:text-gray-900 transition-colors">FAQ</a>
             <a href="#contact" className="hover:text-gray-900 transition-colors">Contact</a>
           </div>
@@ -78,7 +80,7 @@ export function Home() {
             AI-powered data extraction · Now with Gemini 2.5
           </div>
 
-          <h1 className="text-5xl md:text-6xl font-extrabold text-gray-900 leading-[1.08] mb-4 tracking-tight">
+          <h1 className="text-5xl md:text-6xl font-bold text-gray-900 leading-[1.08] mb-4 tracking-tight">
             All-in-one data scraper
             <br />
             <span style={{ color: '#5B4FE8' }}>for modern teams.</span>
@@ -125,7 +127,7 @@ export function Home() {
         <div className="max-w-6xl mx-auto px-6">
           <div className="text-center mb-14">
             <p className="text-xs font-semibold tracking-widest text-indigo-500 uppercase mb-3">Scrapers</p>
-            <h2 className="text-4xl font-extrabold text-gray-900 mb-3">One platform. Every source.</h2>
+            <h2 className="text-4xl font-bold text-gray-900 mb-3">One platform. Every source.</h2>
             <p className="text-gray-500 text-base">Pick a scraper, paste a URL, and ship clean data in seconds.</p>
           </div>
 
@@ -156,8 +158,11 @@ export function Home() {
               <Link
                 key={item.title}
                 to={item.link}
-                className="group rounded-2xl border border-gray-100 p-7 bg-white hover:shadow-md transition-all hover:border-indigo-100"
-                style={{ boxShadow: '0 1px 4px 0 oklch(0.21 0.05 264 / 0.05)' }}
+                className="group rounded-2xl border border-gray-100 p-7 hover:shadow-md transition-all hover:border-indigo-100"
+                style={{
+                  background: 'linear-gradient(180deg, oklch(100% 0 0) 0%, oklch(98.5% .005 255) 100%)',
+                  boxShadow: '0 1px 4px 0 oklch(0.21 0.05 264 / 0.05)',
+                }}
               >
                 <div className={`w-10 h-10 rounded-xl ${item.bg} flex items-center justify-center mb-5`}>
                   {item.icon}
@@ -175,7 +180,7 @@ export function Home() {
         <div className="max-w-6xl mx-auto px-6">
           <div className="text-center mb-14">
             <p className="text-xs font-semibold tracking-widest text-indigo-500 uppercase mb-3">How It Works</p>
-            <h2 className="text-4xl font-extrabold text-gray-900 mb-3">From URL to insight in four steps</h2>
+            <h2 className="text-4xl font-bold text-gray-900 mb-3">From URL to insight in four steps</h2>
             <p className="text-gray-500 text-base">A clean workflow built around your data.</p>
           </div>
 
@@ -205,7 +210,7 @@ export function Home() {
         <div className="max-w-6xl mx-auto px-6">
           <div className="text-center mb-14">
             <p className="text-xs font-semibold tracking-widest text-indigo-500 uppercase mb-3">Features</p>
-            <h2 className="text-4xl font-extrabold text-gray-900 mb-3">Everything you need for data extraction</h2>
+            <h2 className="text-4xl font-bold text-gray-900 mb-3">Everything you need for data extraction</h2>
             <p className="text-gray-500 text-base">Built for analysts, marketers, and engineers.</p>
           </div>
 
@@ -243,7 +248,7 @@ export function Home() {
       >
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <p className="text-xs font-semibold tracking-widest uppercase mb-3" style={{ color: 'oklch(54% .22 277)' }}>Product</p>
-          <h2 className="text-4xl font-extrabold mb-3" style={{ color: 'oklch(0.21 0.05 264)', letterSpacing: '-0.025em' }}>
+          <h2 className="text-4xl font-bold mb-3" style={{ color: 'oklch(0.21 0.05 264)', letterSpacing: '-0.025em' }}>
             A dashboard worth opening every day
           </h2>
           <p className="text-base mb-14" style={{ color: 'oklch(0.52 0.03 257)' }}>Clean, fast, and built for focus.</p>
@@ -382,14 +387,21 @@ export function Home() {
       {/* ── TESTIMONIALS ── */}
       <section className="py-24 bg-white">
         <div className="max-w-6xl mx-auto px-6">
-          <h2 className="text-3xl font-extrabold text-gray-900 text-center mb-12">What our customers say</h2>
+          <h2 className="text-3xl font-bold text-gray-900 text-center mb-12">What our customers say</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {[
               { quote: '"Scrapify replaced three internal tools. Our team ships data pipelines in hours, not weeks."', name: 'Sarah Chen', role: 'Head of Data, Northwind', initials: 'SC' },
               { quote: '"The cleanest scraping UX I\'ve ever used. Feels like Linear, works like Stripe."', name: 'Marcus Reyes', role: 'Founder, Aperture', initials: 'MR' },
               { quote: '"Reliable, fast, and the exports just work. Our analysts love it."', name: 'Priya Nair', role: 'Analytics Lead, Tesla', initials: 'PN' },
             ].map(t => (
-              <div key={t.name} className="rounded-2xl border border-gray-100 p-7 bg-white" style={{ boxShadow: '0 1px 4px 0 oklch(0.21 0.05 264 / 0.05)' }}>
+              <div
+                key={t.name}
+                className="rounded-2xl border border-gray-100 p-7"
+                style={{
+                  background: 'linear-gradient(180deg, oklch(100% 0 0) 0%, oklch(98.5% .005 255) 100%)',
+                  boxShadow: '0 1px 4px 0 oklch(0.21 0.05 264 / 0.05)',
+                }}
+              >
                 <p className="text-sm text-gray-700 leading-relaxed mb-6">{t.quote}</p>
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ background: 'linear-gradient(135deg,#5B4FE8,#7C6FEF)' }}>
@@ -411,7 +423,7 @@ export function Home() {
         <div className="max-w-2xl mx-auto px-6">
           <div className="text-center mb-12">
             <p className="text-xs font-semibold tracking-widest text-indigo-500 uppercase mb-3">FAQ</p>
-            <h2 className="text-4xl font-extrabold text-gray-900">Frequently asked questions</h2>
+            <h2 className="text-4xl font-bold text-gray-900">Frequently asked questions</h2>
           </div>
           <div className="space-y-2">
             {faqs.map((item, i) => (
@@ -436,13 +448,159 @@ export function Home() {
         </div>
       </section>
 
+      {/* ── PRICING ── */}
+      <section id="pricing" className="py-24 bg-white">
+        <div className="max-w-5xl mx-auto px-6">
+          <div className="text-center mb-12">
+            <p className="text-xs font-semibold tracking-widest text-indigo-500 uppercase mb-3">Pricing</p>
+            <h2 className="text-4xl font-bold text-gray-900 mb-3">Simple, transparent pricing</h2>
+            <p className="text-gray-500 text-base">Start free. Scale when you're ready.</p>
+          </div>
+
+          {/* Billing toggle */}
+          <div className="flex items-center justify-center gap-3 mb-12">
+            <span className={`text-sm font-medium ${!yearly ? 'text-gray-900' : 'text-gray-400'}`}>Monthly</span>
+            <button
+              onClick={() => setYearly(!yearly)}
+              className={`relative w-12 h-6 rounded-full transition-all duration-300 focus:outline-none ${yearly ? 'bg-indigo-600' : 'bg-gray-200'}`}
+            >
+              <span
+                className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-300 ${yearly ? 'translate-x-6' : 'translate-x-0'}`}
+              />
+            </button>
+            <span className={`text-sm font-medium ${yearly ? 'text-gray-900' : 'text-gray-400'}`}>
+              Yearly
+              <span className="ml-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full">Save 20%</span>
+            </span>
+          </div>
+
+          {/* Plans grid */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+
+            {/* Free Forever */}
+            <div className="rounded-2xl border border-gray-100 bg-white p-8" style={{ boxShadow: '0 1px 4px 0 oklch(0.21 0.05 264 / 0.06)' }}>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4">Free Forever</p>
+              <div className="flex items-end gap-1 mb-1">
+                <span className="text-4xl font-bold text-gray-900">$0</span>
+                <span className="text-sm text-gray-400 mb-1.5">/mo</span>
+              </div>
+              <p className="text-xs text-amber-500 font-medium mb-6">7-day access only</p>
+              <Link
+                to="/signup"
+                className="block w-full text-center py-2.5 rounded-xl text-sm font-semibold border border-gray-200 text-gray-700 hover:bg-gray-50 transition-all mb-8"
+              >
+                Get started free
+              </Link>
+              <ul className="space-y-3 text-sm text-gray-600">
+                {[
+                  'Up to 50 scrapes',
+                  'YouTube & Website scraper',
+                  'CSV export',
+                  'Community support',
+                  '7-day free trial',
+                ].map(f => (
+                  <li key={f} className="flex items-start gap-2.5">
+                    <Check className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
+                    {f}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Basic — RECOMMENDED */}
+            <div
+              className="rounded-2xl border-2 border-indigo-500 p-8 relative"
+              style={{
+                background: 'linear-gradient(180deg, oklch(100% 0 0) 0%, oklch(98.5% .005 255) 100%)',
+                boxShadow: '0 8px 32px -4px oklch(0.54 0.22 277 / 0.18)',
+              }}
+            >
+              {/* Recommended badge */}
+              <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
+                <span className="text-xs font-bold text-white px-3 py-1 rounded-full" style={{ background: 'linear-gradient(135deg, oklch(54% .22 277) 0%, oklch(66% .21 290) 100%)' }}>
+                  Recommended
+                </span>
+              </div>
+
+              <p className="text-xs font-semibold text-indigo-500 uppercase tracking-widest mb-4">Basic</p>
+              <div className="flex items-end gap-1 mb-1">
+                <span className="text-4xl font-bold text-gray-900">${yearly ? '5' : '6'}</span>
+                <span className="text-sm text-gray-400 mb-1.5">/mo</span>
+              </div>
+              {yearly && (
+                <p className="text-xs text-emerald-500 font-medium mb-1">Billed $60/yr · Save $12</p>
+              )}
+              <p className="text-xs text-gray-400 mb-6">{yearly ? 'Billed annually' : 'Billed monthly'}</p>
+              <Link
+                to="/signup"
+                className="block w-full text-center py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90 mb-8"
+                style={{ background: 'linear-gradient(135deg, oklch(54% .22 277) 0%, oklch(66% .21 290) 100%)' }}
+              >
+                Get started
+              </Link>
+              <ul className="space-y-3 text-sm text-gray-600">
+                {[
+                  'Unlimited scrapes',
+                  'YouTube, Website & Map scraper',
+                  'Excel, PDF & JSON export',
+                  'Priority email support',
+                  'AI-powered extraction',
+                  'API access',
+                ].map(f => (
+                  <li key={f} className="flex items-start gap-2.5">
+                    <Check className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
+                    {f}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Standard */}
+            <div className="rounded-2xl border border-gray-100 bg-white p-8" style={{ boxShadow: '0 1px 4px 0 oklch(0.21 0.05 264 / 0.06)' }}>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4">Standard</p>
+              <div className="flex items-end gap-1 mb-1">
+                <span className="text-4xl font-bold text-gray-900">${yearly ? '9' : '10'}</span>
+                <span className="text-sm text-gray-400 mb-1.5">/mo</span>
+              </div>
+              {yearly && (
+                <p className="text-xs text-emerald-500 font-medium mb-1">Billed $108/yr · Save $12</p>
+              )}
+              <p className="text-xs text-gray-400 mb-6">{yearly ? 'Billed annually' : 'Billed monthly'}</p>
+              <Link
+                to="/signup"
+                className="block w-full text-center py-2.5 rounded-xl text-sm font-semibold border border-gray-200 text-gray-700 hover:bg-gray-50 transition-all mb-8"
+              >
+                Get started
+              </Link>
+              <ul className="space-y-3 text-sm text-gray-600">
+                {[
+                  'Everything in Basic',
+                  'Unlimited team members',
+                  'Advanced analytics',
+                  'Custom export templates',
+                  'Dedicated account manager',
+                  'SLA guarantee',
+                  'White-label exports',
+                ].map(f => (
+                  <li key={f} className="flex items-start gap-2.5">
+                    <Check className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
+                    {f}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
       {/* ── CTA BANNER ── */}
       <section className="py-16 px-6">
         <div
           className="max-w-4xl mx-auto rounded-2xl px-10 py-14 text-center text-white"
           style={{ background: 'linear-gradient(135deg, #5B4FE8 0%, #7C6FEF 100%)' }}
         >
-          <h2 className="text-3xl font-extrabold mb-3">Ready to extract data the easy way?</h2>
+          <h2 className="text-3xl font-bold mb-3">Ready to extract data the easy way?</h2>
           <p className="text-indigo-200 mb-8 text-base">Join thousands of teams already scraping smarter with Scrapify.</p>
           <div className="flex items-center justify-center gap-3 flex-wrap">
             <Link
@@ -473,7 +631,7 @@ export function Home() {
             {/* Brand */}
             <div>
               <div className="flex items-center gap-2 mb-4">
-                <img src="/scrapify.png" alt="Scrapify" className="h-7 object-contain" />
+                <img src="/scrapify.png" alt="Scrapify" className="h-10 w-auto object-contain" />
               </div>
               <p className="text-sm text-gray-400 leading-relaxed max-w-xs">
                 The professional data extraction platform. Built for modern teams who move fast.
@@ -510,3 +668,4 @@ export function Home() {
     </div>
   );
 }
+
