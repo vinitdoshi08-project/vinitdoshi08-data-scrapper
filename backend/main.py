@@ -31,18 +31,22 @@ load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
 
 app = FastAPI()
 
-# ── CORS ──────────────────────────────────────────────────────
+# ── CORS — reads ALLOWED_ORIGINS env var (comma-separated) ───
+_raw_origins = os.environ.get("ALLOWED_ORIGINS", "")
+_extra_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
+_allow_origins = list(set([
+    "http://localhost:5173",
+    "http://localhost:4173",
+] + _extra_origins))
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:4173",
-        "https://scrapify.netlify.app",        # ← replace with your actual Netlify URL
-        "https://deploy-preview--scrapify.netlify.app",  # preview deploys
-    ],
+    allow_origins=_allow_origins,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Video-Count", "Content-Length", "Content-Disposition"],
+)
     expose_headers=["X-Video-Count", "Content-Length", "Content-Disposition"],
 )
 
