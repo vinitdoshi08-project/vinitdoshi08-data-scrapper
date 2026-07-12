@@ -48,39 +48,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   async function fetchProfile(authUser: any) {
+    // Always set user from auth metadata immediately — no flash/delay
+    const optimistic: User = {
+      id: authUser.id,
+      email: authUser.email || '',
+      full_name: authUser.user_metadata?.full_name || '',
+      created_at: authUser.created_at || new Date().toISOString(),
+    };
+    setUser(optimistic);
+
     try {
-      // Optimistic UI update: Set user immediately deeply based on metadata so they don't wait for the DB query to login successfully
-      setUser({
-        id: authUser.id,
-        email: authUser.email || '',
-        full_name: authUser.user_metadata?.full_name || '',
-        created_at: authUser.created_at,
-      });
-
-      const { data: profile, error } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .select('*')
+        .select('id, full_name, created_at')   // email lives in auth.users, not profiles
         .eq('id', authUser.id)
-        .single();
+        .maybeSingle();
 
-      if (error) {
-        console.error("Error fetching profile:", error);
+      if (profileError) {
+        console.warn('Profile fetch warning:', profileError.message);
+        return;
+      }
+
+      if (profile) {
         setUser({
-          id: authUser.id,
-          email: authUser.email || '',
-          full_name: authUser.user_metadata?.full_name || '',
-          created_at: authUser.created_at,
-        });
-      } else if (profile) {
-        setUser({
-          id: profile.id,
-          email: profile.email,
-          full_name: profile.full_name || '',
-          created_at: profile.created_at,
+          id:         profile.id,
+          email:      authUser.email || '',          // always from auth.users
+          full_name:  profile.full_name || authUser.user_metadata?.full_name || '',
+          created_at: profile.created_at || authUser.created_at,
         });
       }
+      // If profile is null (no row yet), optimistic user is already set — that's fine
     } catch (err) {
-      console.error(err);
+      console.warn('fetchProfile error:', err);
     } finally {
       setLoading(false);
     }
@@ -96,11 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { error: signupError } = await supabase.auth.signUp({
         email,
         password,
-        options: {
-          data: {
-            full_name: fullName.trim()
-          }
-        }
+        options: { data: { full_name: fullName.trim() } },
       });
 
       if (signupError) throw signupError;
@@ -117,11 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) throw new Error('Invalid email format');
       if (!password) throw new Error('Password is required');
 
-      const { error: signinError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
+      const { error: signinError } = await supabase.auth.signInWithPassword({ email, password });
       if (signinError) throw signinError;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Login failed';
@@ -138,7 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const { error: authError } = await supabase.auth.updateUser({
         email: email.trim(),
-        data: { full_name: fullName.trim() }
+        data: { full_name: fullName.trim() },
       });
       if (authError) throw authError;
 
@@ -146,7 +137,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .from('profiles')
         .update({ full_name: fullName.trim() })
         .eq('id', user.id);
-        
       if (profileError) throw profileError;
 
       setUser({ ...user, full_name: fullName.trim() });
@@ -158,7 +148,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signOut() {
-    setUser(null); // Clear UI immediately for instant logout feeling
+    setUser(null);
     setError(null);
     try {
       await supabase.auth.signOut();
@@ -167,9 +157,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  function clearError() {
-    setError(null);
-  }
+  function clearError() { setError(null); }
 
   return (
     <AuthContext.Provider value={{ user, loading, error, signup, signin, updateProfile, signOut, clearError }}>
@@ -179,9 +167,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 }
 
 export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within an AuthProvider');
+  return ctx;
 }

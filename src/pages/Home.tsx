@@ -1,43 +1,261 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { ArrowRight, Youtube, Globe, Map, Shield, Zap, Download, Bot, CheckCircle2, ChevronDown, ChevronUp, Check } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { ArrowRight, Youtube, Globe, Map, Shield, Zap, Download, Bot, CheckCircle2, ChevronDown, ChevronUp, Check, Loader2, X, CreditCard, User, Lock } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+
+const API_URL   = import.meta.env.VITE_API_URL as string;
+const RZP_KEY_ID = import.meta.env.VITE_RAZORPAY_KEY_ID as string;
 
 const faqs = [
-  {
-    q: 'What types of data can I scrape?',
-    a: 'YouTube videos and playlists, any public website, and map services. Each scraper is tuned to its source.',
-  },
-  {
-    q: 'Is it secure?',
-    a: 'Yes. We use industry-standard encryption for all credentials, and data is transmitted over HTTPS. Your account and exports are fully isolated.',
-  },
-  {
-    q: 'How do I create an account?',
-    a: 'Click "Get started" and fill in your name, email, and password. No credit card required.',
-  },
-  {
-    q: 'Is scraping legal?',
-    a: 'Scraping publicly available data is generally legal, but always comply with the target site\'s terms of service and applicable laws.',
-  },
-  {
-    q: 'Is this free?',
-    a: 'We offer a free forever plan with generous limits. Premium plans unlock unlimited scrapes and advanced exports.',
-  },
+  { q: 'What types of data can I scrape?', a: 'YouTube videos and playlists, any public website, and map services. Each scraper is tuned to its source.' },
+  { q: 'Is it secure?', a: 'Yes. We use industry-standard encryption for all credentials, and data is transmitted over HTTPS.' },
+  { q: 'How do I create an account?', a: 'Click "Get started" and fill in your name, email, and password. No credit card required.' },
+  { q: 'Is scraping legal?', a: 'Scraping publicly available data is generally legal, but always comply with the target site\'s terms of service.' },
+  { q: 'Is this free?', a: 'We offer a free forever plan with a 3-day trial. Premium plans unlock unlimited scrapes.' },
 ];
 
+function Toast({ msg, onClose }: { msg: { type: 'success' | 'error'; text: string }; onClose: () => void }) {
+  useEffect(() => { const t = setTimeout(onClose, 7000); return () => clearTimeout(t); }, [onClose]);
+  return (
+    <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl border text-sm font-medium max-w-md w-full mx-4 ${
+      msg.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-700'
+    }`}>
+      <span className="flex-1">{msg.text}</span>
+      <button onClick={onClose} className="shrink-0 opacity-60 hover:opacity-100"><X className="w-3.5 h-3.5" /></button>
+    </div>
+  );
+}
+
+/** Modal shown after payment — collects email+password to create/login account */
+function PostPaymentModal({
+  planId, planName, paymentId, orderId, amountPaise,
+  onSuccess, onClose,
+}: {
+  planId: string; planName: string; paymentId: string; orderId: string; amountPaise: number;
+  onSuccess: () => void; onClose: () => void;
+}) {
+  const [mode, setMode]         = useState<'signup' | 'login'>('signup');
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail]       = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading]   = useState(false);
+  const [err, setErr]           = useState('');
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setErr(''); setLoading(true);
+    try {
+      let userId: string;
+      let token: string;
+
+      if (mode === 'signup') {
+        const { data, error } = await supabase.auth.signUp({
+          email, password,
+          options: { data: { full_name: fullName.trim() } },
+        });
+        if (error) throw error;
+        if (!data.user) throw new Error('Signup failed — please try logging in instead.');
+        userId = data.user.id;
+        // Get fresh session token
+        const { data: { session } } = await supabase.auth.getSession();
+        token = session?.access_token ?? '';
+      } else {
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        userId = data.user.id;
+        token  = data.session?.access_token ?? '';
+      }
+
+      if (!token) throw new Error('Could not get session token.');
+
+      // Save subscription to backend
+      const res = await fetch(`${API_URL}/api/save-subscription`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token,
+          plan:                planId,
+          razorpay_payment_id: paymentId,
+          razorpay_order_id:   orderId,
+          amount:              amountPaise,
+          currency:            'INR',
+        }),
+      });
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        throw new Error(e.detail ?? 'Failed to activate plan. Contact support.');
+      }
+
+      onSuccess();
+    } catch (e: any) {
+      setErr(e.message ?? 'Something went wrong.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[150] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-8 relative">
+        <button onClick={onClose} className="absolute top-4 right-4 w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500">
+          <X className="w-4 h-4" />
+        </button>
+
+        {/* Success header */}
+        <div className="text-center mb-6">
+          <div className="w-14 h-14 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-3">
+            <CreditCard className="w-7 h-7 text-emerald-600" />
+          </div>
+          <h2 className="text-xl font-bold text-gray-900">Payment successful! 🎉</h2>
+          <p className="text-sm text-gray-500 mt-1">
+            {mode === 'signup' ? 'Create your account to activate the' : 'Log in to activate the'}{' '}
+            <strong>{planName}</strong> plan.
+          </p>
+        </div>
+
+        {/* Mode toggle */}
+        <div className="flex rounded-xl border border-gray-200 p-1 mb-5">
+          {(['signup', 'login'] as const).map(m => (
+            <button key={m} onClick={() => { setMode(m); setErr(''); }}
+              className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${mode === m ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+              {m === 'signup' ? 'Create account' : 'Log in'}
+            </button>
+          ))}
+        </div>
+
+        {err && <p className="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{err}</p>}
+
+        <form onSubmit={handleSubmit} className="space-y-3">
+          {mode === 'signup' && (
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Full name</label>
+              <input value={fullName} onChange={e => setFullName(e.target.value)} required placeholder="John Doe"
+                className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500" />
+            </div>
+          )}
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Email address</label>
+            <input type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="you@example.com"
+              className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Password</label>
+            <input type="password" value={password} onChange={e => setPassword(e.target.value)} required placeholder="Min 6 characters"
+              className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          <button type="submit" disabled={loading}
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold text-white mt-2 disabled:opacity-60"
+            style={{ background: 'linear-gradient(135deg,#5B4FE8,#7C6FEF)' }}>
+            {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Activating…</> : <><Lock className="w-4 h-4" /> Activate {planName} Plan</>}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export function Home() {
-  const [openFaq, setOpenFaq] = useState<number | null>(0);
-  const [yearly, setYearly] = useState(false);
+  const navigate = useNavigate();
+  const [openFaq, setOpenFaq]       = useState<number | null>(0);
+  const [yearly, setYearly]         = useState(false);
+  const [payingPlan, setPayingPlan] = useState<string | null>(null);
+  const [toast, setToast]           = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [postPayment, setPostPayment] = useState<{
+    planId: string; planName: string; paymentId: string; orderId: string; amountInr: number;
+  } | null>(null);
+
+  // Live USD → INR rate (fetched once on mount, fallback = 84)
+  const [usdToInr, setUsdToInr] = useState<number>(84);
+  const [rateLoaded, setRateLoaded] = useState(false);
+
+  useEffect(() => {
+    // Free public API — no key needed
+    fetch('https://open.er-api.com/v6/latest/USD')
+      .then(r => r.json())
+      .then(d => {
+        const rate = d?.rates?.INR;
+        if (rate && rate > 0) { setUsdToInr(rate); }
+      })
+      .catch(() => {/* keep fallback 84 */})
+      .finally(() => setRateLoaded(true));
+  }, []);
+
+  /** Convert USD dollars to INR paise for Razorpay */
+  function usdToPaise(usd: number): number {
+    return Math.round(usd * usdToInr * 100); // 1 USD = usdToInr rupees = usdToInr*100 paise
+  }
+
+  /** Display string e.g. "$6" with INR equivalent underneath */
+  function inrEquiv(usd: number): string {
+    const inr = Math.round(usd * usdToInr);
+    return `≈ ₹${inr.toLocaleString('en-IN')}`;
+  }
+
+  const dismissToast = () => setToast(null);
+
+  function loadRazorpayScript(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (typeof (window as any).Razorpay !== 'undefined') { resolve(); return; }
+      const s = document.createElement('script');
+      s.src     = 'https://checkout.razorpay.com/v1/checkout.js';
+      s.onload  = () => resolve();
+      s.onerror = () => reject(new Error('Failed to load Razorpay. Check your internet connection.'));
+      document.body.appendChild(s);
+    });
+  }
+
+  async function handlePay(planId: 'basic' | 'standard', planName: string, usdAmount: number) {
+    // Determine plan key based on planId + yearly toggle
+    const planKey = planId === 'basic'
+      ? (yearly ? 'basic_y' : 'basic_m')
+      : (yearly ? 'std_y'   : 'std_m');
+
+    // Check if already logged in
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (session?.access_token) {
+      // Already logged in — go directly to payment via TrialGate flow or inline
+      // Store plan intent and go to pricing anchor where TrialGate handles upgrade
+      sessionStorage.setItem('pending_plan', planKey);
+      navigate('/dashboard');
+    } else {
+      // Not logged in — send to signup with plan intent
+      navigate(`/signup?plan=${planKey}`);
+    }
+  }
 
   return (
     <div className="min-h-screen bg-white" style={{ fontFamily: 'ui-sans-serif, system-ui, sans-serif' }}>
+
+      {/* ── TOAST ── */}
+      {toast && <Toast msg={toast} onClose={dismissToast} />}
+
+      {/* ── POST-PAYMENT SIGNUP/LOGIN MODAL ── */}
+      {postPayment && (
+        <PostPaymentModal
+          planId={postPayment.planId}
+          planName={postPayment.planName}
+          paymentId={postPayment.paymentId}
+          orderId={postPayment.orderId}
+          amountPaise={postPayment.amountInr}
+          onSuccess={() => {
+            setPostPayment(null);
+            setToast({ type: 'success', text: `🎉 ${postPayment.planName} plan activated! Redirecting to dashboard…` });
+            setTimeout(() => navigate('/dashboard'), 2000);
+          }}
+          onClose={() => {
+            setPostPayment(null);
+            setToast({ type: 'error', text: 'Account not linked. Contact support with payment ID: ' + postPayment.paymentId });
+          }}
+        />
+      )}
 
       {/* ── NAV ── */}
       <nav className="sticky top-0 z-50 bg-white border-b border-gray-100">
         <div className="max-w-6xl mx-auto px-6 flex items-center justify-between h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center">
-            <img src="/scrapify.png" alt="Scrapify" className="h-16 w-auto object-contain" />
+            <img src="/scrapify.png" alt="Scrapify" className="h-20 w-auto object-contain" />
           </Link>
 
           {/* Center links */}
@@ -464,9 +682,7 @@ export function Home() {
               onClick={() => setYearly(!yearly)}
               className={`relative w-12 h-6 rounded-full transition-all duration-300 focus:outline-none ${yearly ? 'bg-indigo-600' : 'bg-gray-200'}`}
             >
-              <span
-                className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-300 ${yearly ? 'translate-x-6' : 'translate-x-0'}`}
-              />
+              <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-300 ${yearly ? 'translate-x-6' : 'translate-x-0'}`} />
             </button>
             <span className={`text-sm font-medium ${yearly ? 'text-gray-900' : 'text-gray-400'}`}>
               Yearly
@@ -477,14 +693,14 @@ export function Home() {
           {/* Plans grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
 
-            {/* Free Forever */}
-            <div className="rounded-2xl border border-gray-100 bg-white p-8" style={{ boxShadow: '0 1px 4px 0 oklch(0.21 0.05 264 / 0.06)' }}>
+            {/* ── FREE FOREVER ── */}
+            <div className="rounded-2xl border border-gray-200 bg-white p-8" style={{ boxShadow: '0 1px 4px 0 rgba(30,27,75,0.06)' }}>
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4">Free Forever</p>
               <div className="flex items-end gap-1 mb-1">
                 <span className="text-4xl font-bold text-gray-900">$0</span>
                 <span className="text-sm text-gray-400 mb-1.5">/mo</span>
               </div>
-              <p className="text-xs text-amber-500 font-medium mb-6">7-day access only</p>
+              <p className="text-xs text-amber-500 font-semibold mb-6">3-day trial access</p>
               <Link
                 to="/signup"
                 className="block w-full text-center py-2.5 rounded-xl text-sm font-semibold border border-gray-200 text-gray-700 hover:bg-gray-50 transition-all mb-8"
@@ -492,34 +708,22 @@ export function Home() {
                 Get started free
               </Link>
               <ul className="space-y-3 text-sm text-gray-600">
-                {[
-                  'Up to 50 scrapes',
-                  'YouTube & Website scraper',
-                  'CSV export',
-                  'Community support',
-                  '7-day free trial',
-                ].map(f => (
+                {['Up to 50 scrapes', 'YouTube & Website scraper', 'CSV export', 'Community support', '3-day free trial'].map(f => (
                   <li key={f} className="flex items-start gap-2.5">
-                    <Check className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
-                    {f}
+                    <Check className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />{f}
                   </li>
                 ))}
               </ul>
             </div>
 
-            {/* Basic — RECOMMENDED */}
+            {/* ── BASIC — RECOMMENDED ── */}
             <div
               className="rounded-2xl border-2 border-indigo-500 p-8 relative"
-              style={{
-                background: 'linear-gradient(180deg, oklch(100% 0 0) 0%, oklch(98.5% .005 255) 100%)',
-                boxShadow: '0 8px 32px -4px oklch(0.54 0.22 277 / 0.18)',
-              }}
+              style={{ background: 'linear-gradient(180deg,#fff 0%,#f8f7ff 100%)', boxShadow: '0 8px 32px -4px rgba(91,79,232,0.18)' }}
             >
-              {/* Recommended badge */}
               <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
-                <span className="text-xs font-bold text-white px-3 py-1 rounded-full" style={{ background: 'linear-gradient(135deg, oklch(54% .22 277) 0%, oklch(66% .21 290) 100%)' }}>
-                  Recommended
-                </span>
+                <span className="text-xs font-bold text-white px-4 py-1 rounded-full whitespace-nowrap"
+                  style={{ background: 'linear-gradient(135deg,#5B4FE8,#7C6FEF)' }}>Recommended</span>
               </div>
 
               <p className="text-xs font-semibold text-indigo-500 uppercase tracking-widest mb-4">Basic</p>
@@ -527,64 +731,59 @@ export function Home() {
                 <span className="text-4xl font-bold text-gray-900">${yearly ? '5' : '6'}</span>
                 <span className="text-sm text-gray-400 mb-1.5">/mo</span>
               </div>
-              {yearly && (
-                <p className="text-xs text-emerald-500 font-medium mb-1">Billed $60/yr · Save $12</p>
-              )}
-              <p className="text-xs text-gray-400 mb-6">{yearly ? 'Billed annually' : 'Billed monthly'}</p>
-              <Link
-                to="/signup"
-                className="block w-full text-center py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90 mb-8"
-                style={{ background: 'linear-gradient(135deg, oklch(54% .22 277) 0%, oklch(66% .21 290) 100%)' }}
+              {/* Live INR equivalent */}
+              <p className="text-xs text-indigo-400 font-semibold mb-1">
+                {rateLoaded ? inrEquiv(yearly ? 5 : 6) + '/mo' : '…'} · charged at live rate
+              </p>
+              {yearly
+                ? <p className="text-xs text-emerald-500 font-semibold mb-5">Billed $60/yr · Save $12</p>
+                : <p className="text-xs text-gray-400 mb-5">Billed monthly</p>}
+
+              <button
+                onClick={() => handlePay('basic', 'Basic', yearly ? 5 : 6)}
+                disabled={!!payingPlan}
+                className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 mb-8 disabled:opacity-60 disabled:cursor-not-allowed"
+                style={{ background: 'linear-gradient(135deg,#5B4FE8,#7C6FEF)', boxShadow: '0 4px 14px rgba(91,79,232,0.35)' }}
               >
-                Get started
-              </Link>
+                {payingPlan === 'basic' ? <><Loader2 className="w-4 h-4 animate-spin" /> Processing…</> : 'Get started'}
+              </button>
+
               <ul className="space-y-3 text-sm text-gray-600">
-                {[
-                  'Unlimited scrapes',
-                  'YouTube, Website & Map scraper',
-                  'Excel, PDF & JSON export',
-                  'Priority email support',
-                  'AI-powered extraction',
-                  'API access',
-                ].map(f => (
+                {['Unlimited scrapes', 'YouTube, Website & Map scraper', 'Excel, PDF & JSON export', 'Priority email support', 'AI-powered extraction', 'API access'].map(f => (
                   <li key={f} className="flex items-start gap-2.5">
-                    <Check className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
-                    {f}
+                    <Check className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />{f}
                   </li>
                 ))}
               </ul>
             </div>
 
-            {/* Standard */}
-            <div className="rounded-2xl border border-gray-100 bg-white p-8" style={{ boxShadow: '0 1px 4px 0 oklch(0.21 0.05 264 / 0.06)' }}>
+            {/* ── STANDARD ── */}
+            <div className="rounded-2xl border border-gray-200 bg-white p-8" style={{ boxShadow: '0 1px 4px 0 rgba(30,27,75,0.06)' }}>
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4">Standard</p>
               <div className="flex items-end gap-1 mb-1">
                 <span className="text-4xl font-bold text-gray-900">${yearly ? '9' : '10'}</span>
                 <span className="text-sm text-gray-400 mb-1.5">/mo</span>
               </div>
-              {yearly && (
-                <p className="text-xs text-emerald-500 font-medium mb-1">Billed $108/yr · Save $12</p>
-              )}
-              <p className="text-xs text-gray-400 mb-6">{yearly ? 'Billed annually' : 'Billed monthly'}</p>
-              <Link
-                to="/signup"
-                className="block w-full text-center py-2.5 rounded-xl text-sm font-semibold border border-gray-200 text-gray-700 hover:bg-gray-50 transition-all mb-8"
+              {/* Live INR equivalent */}
+              <p className="text-xs text-indigo-400 font-semibold mb-1">
+                {rateLoaded ? inrEquiv(yearly ? 9 : 10) + '/mo' : '…'} · charged at live rate
+              </p>
+              {yearly
+                ? <p className="text-xs text-emerald-500 font-semibold mb-5">Billed $108/yr · Save $12</p>
+                : <p className="text-xs text-gray-400 mb-5">Billed monthly</p>}
+
+              <button
+                onClick={() => handlePay('standard', 'Standard', yearly ? 9 : 10)}
+                disabled={!!payingPlan}
+                className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-bold border border-gray-200 text-gray-700 hover:bg-gray-50 transition-all mb-8 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                Get started
-              </Link>
+                {payingPlan === 'standard' ? <><Loader2 className="w-4 h-4 animate-spin" /> Processing…</> : 'Get started'}
+              </button>
+
               <ul className="space-y-3 text-sm text-gray-600">
-                {[
-                  'Everything in Basic',
-                  'Unlimited team members',
-                  'Advanced analytics',
-                  'Custom export templates',
-                  'Dedicated account manager',
-                  'SLA guarantee',
-                  'White-label exports',
-                ].map(f => (
+                {['Everything in Basic', 'Unlimited team members', 'Advanced analytics', 'Custom export templates', 'Dedicated account manager', 'SLA guarantee', 'White-label exports'].map(f => (
                   <li key={f} className="flex items-start gap-2.5">
-                    <Check className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
-                    {f}
+                    <Check className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />{f}
                   </li>
                 ))}
               </ul>
@@ -631,7 +830,7 @@ export function Home() {
             {/* Brand */}
             <div>
               <div className="flex items-center gap-2 mb-4">
-                <img src="/scrapify.png" alt="Scrapify" className="h-10 w-auto object-contain" />
+                <img src="/scrapify.png" alt="Scrapify" className="h-14 w-auto object-contain" />
               </div>
               <p className="text-sm text-gray-400 leading-relaxed max-w-xs">
                 The professional data extraction platform. Built for modern teams who move fast.
