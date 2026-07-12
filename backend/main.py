@@ -497,6 +497,15 @@ async def scrape_youtube(
 async def root():
     return {"message": "YouTube Scraper API is running"}
 
+@app.get("/api/health")
+async def health():
+    return {
+        "status": "ok",
+        "razorpay_configured": bool(RZP_KEY_ID and RZP_KEY_SECRET),
+        "razorpay_key_prefix": RZP_KEY_ID[:16] + "..." if RZP_KEY_ID else "NOT SET",
+        "supabase_configured": bool(SUPABASE_URL and SUPABASE_SERVICE_KEY),
+    }
+
 # ── Razorpay: Create Order ────────────────────────────────────
 @app.post("/api/create-order")
 async def create_order(body: CreateOrderRequest):
