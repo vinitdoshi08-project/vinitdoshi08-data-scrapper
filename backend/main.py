@@ -526,7 +526,9 @@ async def create_order(body: CreateOrderRequest):
                 },
             )
         if not resp.is_success:
-            raise HTTPException(status_code=500, detail=f"Razorpay error: {resp.text}")
+            error_body = resp.text
+            print(f"[create-order] Razorpay error status={resp.status_code} body={error_body}")
+            raise HTTPException(status_code=500, detail=f"Razorpay error: {error_body}")
         order = resp.json()
         return {
             "order_id": order["id"],
