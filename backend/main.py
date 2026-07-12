@@ -20,7 +20,6 @@ from dotenv import load_dotenv
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from pydantic import BaseModel, EmailStr
-import razorpay
 from scraper import (
     extract_id_from_url, fetch_playlist_videos, fetch_video_details,
     save_to_excel, save_to_pdf, save_to_json, DEFAULT_API_KEY,
@@ -141,10 +140,9 @@ async def sb_insert_payment(data: dict) -> bool:
     except Exception:
         return False
 
-# ── Razorpay client ───────────────────────────────────────────
+# ── Razorpay config (no SDK — direct REST API via httpx) ─────
 RZP_KEY_ID     = os.environ.get("RAZORPAY_KEY_ID", "")
 RZP_KEY_SECRET = os.environ.get("RAZORPAY_KEY_SECRET", "")
-rzp_client = razorpay.Client(auth=(RZP_KEY_ID, RZP_KEY_SECRET)) if RZP_KEY_ID and RZP_KEY_SECRET else None
 
 # ── Fernet (API key encryption) ───────────────────────────────
 _raw_key   = hashlib.sha256(SECRET_KEY.encode()).digest()
@@ -502,22 +500,32 @@ async def root():
 # ── Razorpay: Create Order ────────────────────────────────────
 @app.post("/api/create-order")
 async def create_order(body: CreateOrderRequest):
-    if not rzp_client:
+    if not RZP_KEY_ID or not RZP_KEY_SECRET:
         raise HTTPException(status_code=500, detail="Razorpay not configured on server.")
     if body.amount < 100:
         raise HTTPException(status_code=400, detail="Amount must be at least 100 (smallest currency unit).")
     try:
         receipt = body.receipt or f"rcpt_{uuid.uuid4().hex[:12]}"
-        order = rzp_client.order.create({
-            "amount":   body.amount,
-            "currency": body.currency,
-            "receipt":  receipt,
-        })
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.post(
+                "https://api.razorpay.com/v1/orders",
+                auth=(RZP_KEY_ID, RZP_KEY_SECRET),
+                json={
+                    "amount":   body.amount,
+                    "currency": body.currency,
+                    "receipt":  receipt,
+                },
+            )
+        if not resp.is_success:
+            raise HTTPException(status_code=500, detail=f"Razorpay error: {resp.text}")
+        order = resp.json()
         return {
             "order_id": order["id"],
             "amount":   order["amount"],
             "currency": order["currency"],
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Razorpay error: {str(e)}")
 
