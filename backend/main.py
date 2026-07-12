@@ -47,8 +47,6 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["X-Video-Count", "Content-Length", "Content-Disposition"],
 )
-    expose_headers=["X-Video-Count", "Content-Length", "Content-Disposition"],
-)
 
 # ── Config ────────────────────────────────────────────────────
 BASE_DIR     = os.path.dirname(os.path.abspath(__file__))
