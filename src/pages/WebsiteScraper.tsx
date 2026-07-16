@@ -82,8 +82,10 @@ For EVERY business you find, you MUST perform deep research using Google Search 
 6. Key contact person — search LinkedIn for "Director", "Owner", "Founder", "Managing Director", "CEO", "Partner" at this company. Include their full name.
 7. Job title of the contact person
 8. LinkedIn profile URL of the contact person (if found)
-9. Business category / industry type
-10. Approximate number of employees (if findable)
+9. Facebook page URL of the business (if found)
+10. Instagram profile URL of the business (if found)
+11. Business category / industry type
+12. Approximate number of employees (if findable)
 
 SEARCH STRATEGY:
 - Search "[business name] contact email"
@@ -95,7 +97,7 @@ SEARCH STRATEGY:
 
 CRITICAL OUTPUT RULES:
 - Return a JSON array wrapped in \`\`\`json ... \`\`\` tags
-- Each object MUST have these exact keys: "name", "address", "phone", "email", "website", "contact_person", "job_title", "linkedin_url", "business_type", "employees"
+- Each object MUST have these exact keys: "name", "address", "phone", "email", "website", "contact_person", "job_title", "linkedin_url", "facebook_url", "instagram_url", "business_type", "employees"
 - Use "N/A" only if genuinely impossible to find after thorough search
 - Do NOT fabricate data — only include verified information
 - Every "N/A" represents a missed opportunity — search harder before giving up
@@ -132,6 +134,8 @@ Extract and return:
 - contact_person: Full name of owner/director/CEO/founder
 - job_title: Their exact job title
 - linkedin_url: Their LinkedIn profile URL
+- facebook_url: Business Facebook page URL
+- instagram_url: Business Instagram page URL
 - phone: Direct phone number with country code
 - business_type: Industry/category
 - employees: Approximate staff count
@@ -143,7 +147,7 @@ Use "N/A" only if completely unfindable after exhaustive search.`;
   const match = text.match(/```json\s*([\s\S]*?)\s*```/);
   if (match) { try { return JSON.parse(match[1].trim()); } catch {} }
   const parsed = robustParseJSON(text);
-  return parsed[0] || { email: 'N/A', website: 'N/A', contact_person: 'N/A', job_title: 'N/A', linkedin_url: 'N/A', phone: 'N/A', business_type: 'N/A', employees: 'N/A' };
+  return parsed[0] || { email: 'N/A', website: 'N/A', contact_person: 'N/A', job_title: 'N/A', linkedin_url: 'N/A', facebook_url: 'N/A', instagram_url: 'N/A', phone: 'N/A', business_type: 'N/A', employees: 'N/A' };
 }
 
 // Phase 2 (batch): Deep enrichment for multiple leads
@@ -161,7 +165,7 @@ Businesses to research:
 ${JSON.stringify(leads, null, 2)}
 
 Return a JSON array in \`\`\`json ... \`\`\` tags with exactly ${leads.length} objects in the SAME ORDER.
-Each object must have: "name", "email", "website", "contact_person", "job_title", "linkedin_url", "phone", "business_type", "employees"
+Each object must have: "name", "email", "website", "contact_person", "job_title", "linkedin_url", "facebook_url", "instagram_url", "phone", "business_type", "employees"
 Use "N/A" only after genuinely exhaustive searching. Do not fabricate.`;
 
   const text = await callGemini(apiKey, model, prompt, true);
@@ -361,6 +365,8 @@ export function WebsiteScraper() {
           contact_person: d.contact_person && d.contact_person !== 'N/A' ? d.contact_person : row.contact_person,
           job_title:      d.job_title      && d.job_title      !== 'N/A' ? d.job_title      : row.job_title,
           linkedin_url:   d.linkedin_url   && d.linkedin_url   !== 'N/A' ? d.linkedin_url   : row.linkedin_url,
+          facebook_url:   d.facebook_url   && d.facebook_url   !== 'N/A' ? d.facebook_url   : row.facebook_url,
+          instagram_url:  d.instagram_url  && d.instagram_url  !== 'N/A' ? d.instagram_url  : row.instagram_url,
           phone:          d.phone          && d.phone          !== 'N/A' ? d.phone          : row.phone,
           business_type:  d.business_type  && d.business_type  !== 'N/A' ? d.business_type  : row.business_type,
           employees:      d.employees      && d.employees      !== 'N/A' ? d.employees      : row.employees,
@@ -401,6 +407,8 @@ export function WebsiteScraper() {
               contact_person: d.contact_person && d.contact_person !== 'N/A' ? d.contact_person : item.contact_person,
               job_title:      d.job_title      && d.job_title      !== 'N/A' ? d.job_title      : item.job_title,
               linkedin_url:   d.linkedin_url   && d.linkedin_url   !== 'N/A' ? d.linkedin_url   : item.linkedin_url,
+              facebook_url:   d.facebook_url   && d.facebook_url   !== 'N/A' ? d.facebook_url   : item.facebook_url,
+              instagram_url:  d.instagram_url  && d.instagram_url  !== 'N/A' ? d.instagram_url  : item.instagram_url,
               phone:          d.phone          && d.phone          !== 'N/A' ? d.phone          : item.phone,
               business_type:  d.business_type  && d.business_type  !== 'N/A' ? d.business_type  : item.business_type,
               employees:      d.employees      && d.employees      !== 'N/A' ? d.employees      : item.employees,
@@ -468,7 +476,7 @@ export function WebsiteScraper() {
 
   function exportToCSV() {
     if (!selectedNames.size) return;
-    const headers = ['Row #', 'Company Name', 'Business Type', 'Employees', 'Contact Person', 'Job Title', 'Phone', 'Email', 'Website Address', 'LinkedIn Profile', 'Street Address', 'Google Maps Verification Link'];
+    const headers = ['Row #', 'Company Name', 'Business Type', 'Employees', 'Contact Person', 'Job Title', 'Phone', 'Email', 'Website Address', 'LinkedIn Profile', 'Facebook', 'Instagram', 'Street Address', 'Google Maps Verification Link'];
     const rows = [headers.join(',')];
     extractedData.filter(r => selectedNames.has(r.name)).forEach((row, i) => {
       const q = (v: string) => `"${(v || 'N/A').replace(/"/g, '""')}"`;
@@ -476,7 +484,7 @@ export function WebsiteScraper() {
       rows.push([
         `"${i + 1}"`, q(row.name), q(row.business_type), q(row.employees),
         q(row.contact_person), q(row.job_title), q(row.phone), q(row.email),
-        q(row.website), q(row.linkedin_url), q(row.address), `"${mapsLink}"`
+        q(row.website), q(row.linkedin_url), q(row.facebook_url), q(row.instagram_url), q(row.address), `"${mapsLink}"`
       ].join(','));
     });
     const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
@@ -489,9 +497,9 @@ export function WebsiteScraper() {
   function handleCopyClipboard() {
     const active = extractedData.filter(i => selectedNames.has(i.name));
     if (!active.length) return;
-    const header = 'Name\tBusiness Type\tEmployees\tContact Person\tJob Title\tPhone\tEmail\tWebsite\tLinkedIn\tAddress\n';
+    const header = 'Name\tBusiness Type\tEmployees\tContact Person\tJob Title\tPhone\tEmail\tWebsite\tLinkedIn\tFacebook\tInstagram\tAddress\n';
     const body = active.map(r =>
-      `${r.name||'N/A'}\t${r.business_type||'N/A'}\t${r.employees||'N/A'}\t${r.contact_person||'N/A'}\t${r.job_title||'N/A'}\t${r.phone||'N/A'}\t${r.email||'N/A'}\t${r.website||'N/A'}\t${r.linkedin_url||'N/A'}\t${r.address||'N/A'}`
+      `${r.name||'N/A'}\t${r.business_type||'N/A'}\t${r.employees||'N/A'}\t${r.contact_person||'N/A'}\t${r.job_title||'N/A'}\t${r.phone||'N/A'}\t${r.email||'N/A'}\t${r.website||'N/A'}\t${r.linkedin_url||'N/A'}\t${r.facebook_url||'N/A'}\t${r.instagram_url||'N/A'}\t${r.address||'N/A'}`
     ).join('\n');
     navigator.clipboard.writeText(header + body);
     alert(`Copied ${active.length} records to clipboard! Ready to paste into Excel or Google Sheets.`);
@@ -580,35 +588,28 @@ export function WebsiteScraper() {
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
 
         {/* Topbar */}
-        <header className="h-[64px] bg-white border-b border-gray-200 flex items-center px-6 shrink-0">
+        <header className="h-[64px] bg-white border-b border-gray-200 flex items-center px-8 shrink-0">
           <div className="flex-1 min-w-0">
             <h2 className="text-[15px] font-bold text-gray-900 leading-none">Website Scraper</h2>
             <p className="text-[11px] text-gray-400 mt-0.5 leading-none">AI-powered lead extractor — find businesses, contacts and emails</p>
           </div>
-          <div className="flex items-center gap-2">
-            <button className="relative w-9 h-9 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
-              <Bell className="w-[17px] h-[17px]" />
-              <span className="absolute top-2 right-2 w-[5px] h-[5px] bg-red-500 rounded-full ring-1 ring-white" />
-            </button>
-            <div className="w-px h-5 bg-gray-200 mx-1" />
+          <div className="flex items-center gap-4">
             {subLoading
               ? <span className="hidden sm:inline-flex w-16 h-6 rounded-lg bg-gray-100 animate-pulse" />
               : <span className={`hidden sm:inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1.5 rounded-lg border ${planBadgeClass(plan as any)}`}>
                   <Crown className="w-3 h-3" />{planLabel(plan as any)}
                 </span>
             }
-            <div className="w-px h-5 bg-gray-200 mx-1" />
+            <div className="w-px h-5 bg-gray-200" />
             <button onClick={() => setShowSettings(true)}
-              className="flex items-center gap-2 pl-1.5 pr-3 py-1.5 rounded-xl hover:bg-gray-50 border border-transparent hover:border-gray-200 transition-all">
-              <div className="w-[32px] h-[32px] rounded-full shrink-0 overflow-hidden ring-2 ring-indigo-100 flex items-center justify-center text-white text-xs font-bold"
+              className="flex items-center gap-2.5 pl-2 pr-4 py-1.5 rounded-xl hover:bg-gray-50 border border-transparent hover:border-gray-200 transition-all">
+              <div className="w-[32px] h-[32px] rounded-full shrink-0 overflow-hidden ring-2 ring-indigo-100 flex items-center justify-center text-white text-[13px] font-bold"
                 style={{ background: 'linear-gradient(135deg,#5B4FE8,#7C6FEF)' }}>
-                {avatarError
-                  ? userInitials
-                  : <img src="/avatar.png" alt="" className="w-full h-full object-cover" onError={() => setAvatarError(true)} />}
+                {userInitials}
               </div>
               <div className="hidden sm:block text-left">
                 <p className="text-[13px] font-semibold text-gray-800 leading-none">{user?.full_name || 'User'}</p>
-                <p className="text-[11px] text-gray-400 leading-none mt-0.5 truncate max-w-[100px]">{user?.email?.split('@')[0] || ''}</p>
+                <p className="text-[11px] text-gray-400 leading-none mt-1 truncate max-w-[120px]">{user?.email?.split('@')[0] || ''}</p>
               </div>
             </button>
           </div>
@@ -924,6 +925,8 @@ export function WebsiteScraper() {
                       <th className="p-3 font-semibold text-gray-600 border-r border-gray-200 min-w-[180px]">Email</th>
                       <th className="p-3 font-semibold text-gray-600 border-r border-gray-200 min-w-[140px]">Website</th>
                       <th className="p-3 font-semibold text-gray-600 border-r border-gray-200 min-w-[100px]">LinkedIn</th>
+                      <th className="p-3 font-semibold text-gray-600 border-r border-gray-200 min-w-[100px]">Facebook</th>
+                      <th className="p-3 font-semibold text-gray-600 border-r border-gray-200 min-w-[100px]">Instagram</th>
                       <th className="p-3 font-semibold text-gray-600 border-r border-gray-200 min-w-[160px]">Address</th>
                       <th className="p-3 font-semibold text-gray-600 border-r border-gray-200 min-w-[80px]">Maps</th>
                       <th className="p-3 font-semibold text-gray-600 text-center min-w-[70px]">Enrich</th>
@@ -978,6 +981,22 @@ export function WebsiteScraper() {
                               <a href={row.linkedin_url.startsWith('http') ? row.linkedin_url : `https://${row.linkedin_url}`} target="_blank" rel="noopener noreferrer"
                                 className="text-blue-500 hover:text-blue-700 hover:underline text-xs font-medium inline-flex items-center gap-1">
                                 <span>LinkedIn</span><ExternalLink className="w-2.5 h-2.5" />
+                              </a>
+                            )}
+                          </td>
+                          <td className="p-3 border-r border-gray-100">
+                            {na(row.facebook_url) ? <span className="text-gray-300 text-xs">N/A</span> : (
+                              <a href={row.facebook_url.startsWith('http') ? row.facebook_url : `https://${row.facebook_url}`} target="_blank" rel="noopener noreferrer"
+                                className="text-blue-500 hover:text-blue-700 hover:underline text-xs font-medium inline-flex items-center gap-1">
+                                <span>Facebook</span><ExternalLink className="w-2.5 h-2.5" />
+                              </a>
+                            )}
+                          </td>
+                          <td className="p-3 border-r border-gray-100">
+                            {na(row.instagram_url) ? <span className="text-gray-300 text-xs">N/A</span> : (
+                              <a href={row.instagram_url.startsWith('http') ? row.instagram_url : `https://${row.instagram_url}`} target="_blank" rel="noopener noreferrer"
+                                className="text-pink-500 hover:text-pink-700 hover:underline text-xs font-medium inline-flex items-center gap-1">
+                                <span>Instagram</span><ExternalLink className="w-2.5 h-2.5" />
                               </a>
                             )}
                           </td>
@@ -1054,7 +1073,7 @@ export function WebsiteScraper() {
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-5">
             <h3 className="font-bold text-blue-900 mb-3 text-sm">Exported CSV columns</h3>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {['Row #', 'Company Name', 'Business Type', 'Employees', 'Contact Person', 'Job Title', 'Phone', 'Email', 'Website Address', 'LinkedIn Profile URL', 'Street Address', 'Google Maps Verification Link'].map((col, i) => (
+              {['Row #', 'Company Name', 'Business Type', 'Employees', 'Contact Person', 'Job Title', 'Phone', 'Email', 'Website Address', 'LinkedIn Profile URL', 'Facebook URL', 'Instagram URL', 'Street Address', 'Google Maps Link'].map((col, i) => (
                 <div key={i} className="flex items-center gap-1.5 text-xs text-blue-800">
                   <CheckCircle className="h-3.5 w-3.5 text-blue-500 shrink-0" />
                   <span>{col}</span>

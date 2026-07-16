@@ -445,30 +445,18 @@ export function Dashboard() {
       {/* ══════════════ MAIN CONTENT ══════════════ */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
 
-        {/* Topbar — h-[64px] matches sidebar logo */}
-        <header className="h-[64px] bg-white border-b border-gray-200 flex items-center px-6 shrink-0">
+        {/* Topbar */}
+        <header className="h-[64px] bg-white border-b border-gray-200 flex items-center px-8 shrink-0">
 
           {/* Page title */}
           <div className="flex-1 min-w-0">
             <h2 className="text-[15px] font-bold text-gray-900 leading-none">
               {navItems.find(n => n.path === location.pathname)?.label ?? 'Dashboard'}
             </h2>
-            {/* <p className="text-[11px] text-gray-400 mt-0.5 leading-none">
-              {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-            </p> */}
           </div>
 
           {/* Controls */}
-          <div className="flex items-center gap-2">
-            {/* Bell */}
-            <button className="relative w-9 h-9 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
-              <Bell className="w-[17px] h-[17px]" />
-              <span className="absolute top-2 right-2 w-[5px] h-[5px] bg-red-500 rounded-full ring-1 ring-white" />
-            </button>
-
-            {/* Divider */}
-            <div className="w-px h-5 bg-gray-200 mx-1" />
-
+          <div className="flex items-center gap-4">
             {/* Plan badge — skeleton while loading */}
             {subLoading
               ? <span className="hidden sm:inline-flex w-16 h-6 rounded-lg bg-gray-100 animate-pulse" />
@@ -478,20 +466,18 @@ export function Dashboard() {
             }
 
             {/* Divider */}
-            <div className="w-px h-5 bg-gray-200 mx-1" />
+            <div className="w-px h-5 bg-gray-200" />
 
             {/* Profile */}
             <button onClick={() => { setShowSettings(true); setIsEditingProfile(false); }}
-              className="flex items-center gap-2 pl-1.5 pr-3 py-1.5 rounded-xl hover:bg-gray-50 border border-transparent hover:border-gray-200 transition-all">
-              <div className="w-[32px] h-[32px] rounded-full shrink-0 overflow-hidden ring-2 ring-indigo-100 flex items-center justify-center text-white text-xs font-bold"
+              className="flex items-center gap-2.5 pl-2 pr-4 py-1.5 rounded-xl hover:bg-gray-50 border border-transparent hover:border-gray-200 transition-all">
+              <div className="w-[32px] h-[32px] rounded-full shrink-0 overflow-hidden ring-2 ring-indigo-100 flex items-center justify-center text-white text-[13px] font-bold"
                 style={{ background: 'linear-gradient(135deg,#5B4FE8,#7C6FEF)' }}>
-                {avatarError
-                  ? userInitials
-                  : <img src="/avatar.png" alt="" className="w-full h-full object-cover" onError={() => setAvatarError(true)} />}
+                {userInitials}
               </div>
               <div className="hidden sm:block text-left">
                 <p className="text-[13px] font-semibold text-gray-800 leading-none">{user?.full_name || 'User'}</p>
-                <p className="text-[11px] text-gray-400 leading-none mt-0.5 truncate max-w-[100px]">{user?.email?.split('@')[0] || ''}</p>
+                <p className="text-[11px] text-gray-400 leading-none mt-1 truncate max-w-[120px]">{user?.email?.split('@')[0] || ''}</p>
               </div>
             </button>
           </div>
