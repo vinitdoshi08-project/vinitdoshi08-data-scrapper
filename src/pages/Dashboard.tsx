@@ -1,13 +1,52 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useSubscription, planLabel, planBadgeClass } from '../contexts/SubscriptionContext';
+import { ProfileModal } from '../components/ProfileModal';
 import {
   Youtube, Globe, Map, LogOut, Settings, ArrowRight, X,
   Edit2, Check, Loader2, LayoutDashboard, User, Bell,
   Plus, Crown, AlertTriangle, RefreshCw, ShieldCheck,
-  CheckCircle2,
+  CheckCircle2, Lock, Sparkles,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
+
+const UPGRADE_PLANS = [
+  {
+    id: 'basic' as const, name: 'Basic',
+    monthly: { usd: 6,  label: '$6'  },
+    yearly:  { usd: 5,  label: '$5', total: '$60/yr'  },
+    features: ['Unlimited scrapes', 'YouTube & Website scraper', 'Excel, PDF & JSON', 'Priority support', 'AI extraction'],
+    highlight: true,
+  },
+  {
+    id: 'standard' as const, name: 'Standard',
+    monthly: { usd: 9, label: '$9' },
+    yearly:  { usd: 8,  label: '$8', total: '$96/yr' },
+    features: ['Everything in Basic', 'Unlimited team members', 'Advanced analytics', 'Custom exports', 'SLA guarantee'],
+    highlight: false,
+  },
+];
+
+async function fetchUsdToInrRate(): Promise<number> {
+  try {
+    const r = await fetch('https://open.er-api.com/v6/latest/USD');
+    const d = await r.json();
+    const rate = d?.rates?.INR;
+    return rate && rate > 0 ? rate : 84;
+  } catch { return 84; }
+}
+
+function loadRzpScript(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if ((window as any).Razorpay) { resolve(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error('Failed to load Razorpay'));
+    document.body.appendChild(s);
+  });
+}
 
 const recentScrapes = [
   { name: 'accountants in London, UK',   source: 'Website', status: 'completed', rows: 142,  when: '2h ago'   },
@@ -146,7 +185,7 @@ function SubscriptionCard({ plan, can_scrape, trial_ends_at, expires_at, billing
 
 export function Dashboard() {
   const { user, signOut, updateProfile } = useAuth();
-  const { plan, can_scrape, trial_ends_at, loading: subLoading, billing_cycle } = useSubscription() as any;
+  const { plan, can_scrape, trial_ends_at, loading: subLoading, billing_cycle, freshLoaded, refresh } = useSubscription() as any;
   const expires_at = (useSubscription() as any).expires_at ?? null;
   const navigate   = useNavigate();
   const location   = useLocation();
@@ -160,15 +199,18 @@ export function Dashboard() {
   const [profileError, setProfileError] = useState('');
   const [isUpdating,   setIsUpdating]   = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [showExpiredModal, setShowExpiredModal] = useState(false);
+
+  // Upgrade modal state
+  const [showUpgrade, setShowUpgrade] = useState(false);
+  const [paying,      setPaying]      = useState<string | null>(null);
+  const [upgradeMsg,  setUpgradeMsg]  = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [usdToInr,    setUsdToInr]    = useState<number>(84);
+  const [yearlyBilling, setYearlyBilling] = useState(false);
+
+  useEffect(() => { fetchUsdToInrRate().then(setUsdToInr); }, []);
 
   const isPaid    = plan === 'basic' || plan === 'standard';
   const isExpired = !can_scrape && !subLoading;
-
-  // Show expired modal automatically once
-  useEffect(() => {
-    if (isExpired) setShowExpiredModal(true);
-  }, [isExpired]);
 
   useEffect(() => {
     if (user) { setEditName(user.full_name || ''); setEditEmail(user.email || ''); }
@@ -188,7 +230,90 @@ export function Dashboard() {
   }
 
   async function handleLogOut() {
-    try { await signOut(); navigate('/'); } catch {}
+    try { await signOut(); navigate('/login'); } catch {}
+  }
+
+  async function handlePay(p: typeof UPGRADE_PLANS[0]) {
+    // yearly charges full year amount, monthly charges 1 month
+    const usdPrice = yearlyBilling ? p.yearly.usd * 12 : p.monthly.usd;
+    const billingLabel = yearlyBilling ? `${p.yearly.total}` : `${p.monthly.label}/mo`;
+    setUpgradeMsg(null);
+    setPaying(p.id);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) { setUpgradeMsg({ type: 'error', text: 'Please log in first.' }); return; }
+
+      const API_URL = import.meta.env.VITE_API_URL as string;
+      const RZP_KEY = import.meta.env.VITE_RAZORPAY_KEY_ID as string;
+
+      const rate        = await fetchUsdToInrRate();
+      const amountPaise = Math.round(usdPrice * rate * 100);
+
+      await loadRzpScript();
+
+      const orderRes = await fetch(`${API_URL}/api/create-order`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: amountPaise, currency: 'INR' }),
+      });
+      if (!orderRes.ok) throw new Error('Could not create order. Try again.');
+      const { order_id, amount, currency } = await orderRes.json();
+
+      await new Promise<void>((resolve) => {
+        const rzp = new (window as any).Razorpay({
+          key: RZP_KEY, amount, currency,
+          name: 'Scrapify',
+          description: `${p.name} Plan — ${billingLabel}`,
+          image: '/scrapify.png', order_id,
+          theme: { color: '#5B4FE8' },
+          prefill: { email: user?.email ?? '', name: user?.full_name ?? '' },
+
+          handler: async (response: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => {
+            try {
+              const vRes = await fetch(`${API_URL}/api/verify-payment`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  razorpay_order_id:   response.razorpay_order_id,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_signature:  response.razorpay_signature,
+                }),
+              });
+              if (!vRes.ok) throw new Error('Payment verification failed.');
+
+              const sRes = await fetch(`${API_URL}/api/save-subscription`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  token, plan: p.id,
+                  billing_cycle:       yearlyBilling ? 'yearly' : 'monthly',
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_order_id:   response.razorpay_order_id,
+                  amount:              usdPrice * 100,
+                  currency:            'USD',
+                }),
+              });
+              if (!sRes.ok) throw new Error('Plan activation failed. Contact support.');
+
+              await refresh();
+              setUpgradeMsg({ type: 'success', text: `🎉 You're now on the ${p.name} plan! Everything is unlocked.` });
+              setTimeout(() => { setShowUpgrade(false); setUpgradeMsg(null); }, 2800);
+            } catch (e: any) {
+              setUpgradeMsg({ type: 'error', text: e.message });
+            }
+            resolve();
+          },
+          modal: { ondismiss: () => resolve() },
+        });
+        rzp.on('payment.failed', (resp: any) => {
+          setUpgradeMsg({ type: 'error', text: resp.error?.description ?? 'Payment failed.' });
+          resolve();
+        });
+        rzp.open();
+      });
+    } catch (e: any) {
+      setUpgradeMsg({ type: 'error', text: e.message ?? 'Something went wrong.' });
+    } finally {
+      setPaying(null);
+    }
   }
 
   const navItems = [
@@ -222,18 +347,27 @@ export function Dashboard() {
 
           <div className="space-y-0.5 mb-5">
             {navItems.map(item => {
-              const active = location.pathname === item.path;
-              const Icon = item.icon;
+              const active  = location.pathname === item.path;
+              const locked  = isExpired && item.path !== '/dashboard';
+              const Icon    = item.icon;
               return (
-                <button key={item.path} onClick={() => navigate(item.path)}
+                <button key={item.path}
+                  onClick={() => { if (locked) { setShowUpgrade(true); } else { navigate(item.path); } }}
                   title={sidebarCollapsed ? item.label : undefined}
                   className={`w-full flex items-center h-9 rounded-lg text-[13px] font-medium transition-all duration-150
                     ${sidebarCollapsed ? 'justify-center' : 'gap-2.5 px-2.5'}
                     ${active
                       ? 'bg-indigo-600 text-white shadow-sm'
-                      : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'}`}>
-                  <Icon className={`w-[17px] h-[17px] shrink-0 ${active ? 'text-white' : item.iColor}`} />
-                  {!sidebarCollapsed && <span className="truncate leading-none">{item.label}</span>}
+                      : locked
+                        ? 'text-gray-300 cursor-pointer opacity-50 hover:opacity-70'
+                        : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'}`}>
+                  <Icon className={`w-[17px] h-[17px] shrink-0 ${active ? 'text-white' : locked ? 'text-gray-300' : item.iColor}`} />
+                  {!sidebarCollapsed && (
+                    <span className="truncate leading-none flex-1 text-left">{item.label}</span>
+                  )}
+                  {!sidebarCollapsed && locked && (
+                    <Lock className="w-3 h-3 shrink-0 text-gray-300" />
+                  )}
                 </button>
               );
             })}
@@ -267,27 +401,36 @@ export function Dashboard() {
 
         {/* Plan chip */}
         {!sidebarCollapsed && (
-          <div className={`mx-3 mb-3 rounded-xl px-3.5 py-3 border ${isPaid ? 'bg-indigo-50 border-indigo-100' : 'bg-amber-50 border-amber-100'}`}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <Crown className={`w-3.5 h-3.5 shrink-0 ${isPaid ? 'text-indigo-500' : 'text-amber-500'}`} />
-                <span className={`text-xs font-bold ${isPaid ? 'text-indigo-700' : 'text-amber-700'}`}>
-                  {planLabel(plan as any)}
-                </span>
+          <div className={`mx-3 mb-3 rounded-xl px-3.5 py-3 border ${subLoading ? 'bg-gray-50 border-gray-100' : isPaid ? 'bg-indigo-50 border-indigo-100' : 'bg-amber-50 border-amber-100'}`}>
+            {subLoading ? (
+              <div className="flex items-center gap-2 py-0.5">
+                <div className="w-3.5 h-3.5 rounded-full bg-gray-200 animate-pulse shrink-0" />
+                <div className="h-3 w-16 bg-gray-200 rounded animate-pulse" />
               </div>
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                isExpired ? 'bg-red-100 text-red-600'
-                : isPaid ? 'bg-emerald-100 text-emerald-700'
-                : 'bg-amber-100 text-amber-700'}`}>
-                {isExpired ? 'Expired' : 'Active'}
-              </span>
-            </div>
-            {!isPaid && !isExpired && (
-              <button onClick={() => navigate('/#pricing')}
-                className="w-full mt-2.5 text-[11px] font-bold text-white py-1.5 rounded-lg hover:opacity-90 transition-opacity"
-                style={{ background: 'linear-gradient(135deg,#5B4FE8,#7C6FEF)' }}>
-                Upgrade Plan
-              </button>
+            ) : (
+              <>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Crown className={`w-3.5 h-3.5 shrink-0 ${isPaid ? 'text-indigo-500' : 'text-amber-500'}`} />
+                    <span className={`text-xs font-bold ${isPaid ? 'text-indigo-700' : 'text-amber-700'}`}>
+                      {planLabel(plan as any)}
+                    </span>
+                  </div>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    isExpired ? 'bg-red-100 text-red-600'
+                    : isPaid ? 'bg-emerald-100 text-emerald-700'
+                    : 'bg-amber-100 text-amber-700'}`}>
+                    {isExpired ? 'Expired' : 'Active'}
+                  </span>
+                </div>
+                {(!isPaid || isExpired) && !subLoading && (
+                  <button onClick={() => setShowUpgrade(true)}
+                    className="w-full mt-2.5 text-[11px] font-bold text-white py-1.5 rounded-lg hover:opacity-90 transition-opacity"
+                    style={{ background: 'linear-gradient(135deg,#5B4FE8,#7C6FEF)' }}>
+                    {isExpired ? 'Renew Plan' : 'Upgrade Plan'}
+                  </button>
+                )}
+              </>
             )}
           </div>
         )}
@@ -326,10 +469,13 @@ export function Dashboard() {
             {/* Divider */}
             <div className="w-px h-5 bg-gray-200 mx-1" />
 
-            {/* Plan badge */}
-            <span className={`hidden sm:inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1.5 rounded-lg border ${planBadgeClass(plan as any)}`}>
-              <Crown className="w-3 h-3" />{planLabel(plan as any)}
-            </span>
+            {/* Plan badge — skeleton while loading */}
+            {subLoading
+              ? <span className="hidden sm:inline-flex w-16 h-6 rounded-lg bg-gray-100 animate-pulse" />
+              : <span className={`hidden sm:inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1.5 rounded-lg border ${planBadgeClass(plan as any)}`}>
+                  <Crown className="w-3 h-3" />{planLabel(plan as any)}
+                </span>
+            }
 
             {/* Divider */}
             <div className="w-px h-5 bg-gray-200 mx-1" />
@@ -367,15 +513,26 @@ export function Dashboard() {
             </button>
           </div>
 
-          {/* ── Subscription Card — full width, gradient background ── */}
-          <SubscriptionCard
-            plan={plan}
-            can_scrape={can_scrape}
-            trial_ends_at={trial_ends_at}
-            expires_at={expires_at}
-            billing_cycle={billing_cycle}
-            onUpgrade={() => navigate('/#pricing')}
-          />
+          {/* ── Subscription Card ── */}
+          {subLoading ? (
+            <div className="rounded-2xl border border-gray-100 p-6 animate-pulse bg-gray-50 h-20 flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-gray-200 shrink-0" />
+              <div className="flex-1 space-y-2">
+                <div className="h-3 w-24 bg-gray-200 rounded" />
+                <div className="h-4 w-32 bg-gray-200 rounded" />
+              </div>
+              <div className="h-6 w-14 bg-gray-200 rounded-full" />
+            </div>
+          ) : (
+            <SubscriptionCard
+              plan={plan}
+              can_scrape={can_scrape}
+              trial_ends_at={trial_ends_at}
+              expires_at={expires_at}
+              billing_cycle={billing_cycle}
+              onUpgrade={() => setShowUpgrade(true)}
+            />
+          )}
 
           {/* Quick start scrapers */}
           <div>
@@ -384,45 +541,52 @@ export function Dashboard() {
                 <h2 className="text-base font-bold text-gray-900">Quick start</h2>
                 <p className="text-sm text-gray-500 mt-0.5">Choose a scraper to begin extracting data.</p>
               </div>
+              {isExpired && (
+                <button onClick={() => setShowUpgrade(true)}
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-white px-3 py-1.5 rounded-lg hover:opacity-90 transition-all"
+                  style={{ background: 'linear-gradient(135deg,#5B4FE8,#7C6FEF)' }}>
+                  <Sparkles className="w-3 h-3" /> Unlock all scrapers
+                </button>
+              )}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
 
               {/* YouTube Scraper card */}
-              <div onClick={() => navigate('/youtube-scraper')}
-                className="relative bg-white rounded-2xl border border-gray-100 overflow-hidden cursor-pointer group transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:border-red-100"
+              <div
+                onClick={() => isExpired ? setShowUpgrade(true) : navigate('/youtube-scraper')}
+                className={`relative bg-white rounded-2xl border border-gray-100 overflow-hidden group transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:border-red-100 ${isExpired ? 'cursor-pointer opacity-50 grayscale' : 'cursor-pointer'}`}
                 style={{ boxShadow: '0 2px 8px rgba(30,27,75,0.06)' }}>
-                {/* Accent bar */}
                 <div className="h-1 w-full bg-gradient-to-r from-red-400 to-rose-500" />
                 <div className="p-6">
-                  {/* Icon + badge row */}
                   <div className="flex items-start justify-between mb-5">
                     <div className="w-12 h-12 rounded-2xl bg-red-50 flex items-center justify-center ring-1 ring-red-100">
                       <Youtube className="w-6 h-6 text-red-500" />
                     </div>
-                    <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-red-50 text-red-500 border border-red-100 uppercase tracking-wide">Active</span>
+                    {isExpired
+                      ? <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-gray-100 text-gray-400 border border-gray-200 uppercase tracking-wide flex items-center gap-1"><Lock className="w-2.5 h-2.5" /> Locked</span>
+                      : <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-red-50 text-red-500 border border-red-100 uppercase tracking-wide">Active</span>
+                    }
                   </div>
-                  {/* Title & desc */}
                   <h3 className="text-[15px] font-bold text-gray-900 mb-1 leading-snug">YouTube Scraper</h3>
                   <p className="text-xs text-gray-400 mb-5 leading-relaxed">Extract videos, channel data, playlists and engagement metrics.</p>
-                  {/* Feature tags */}
                   <div className="flex flex-wrap gap-1.5 mb-5">
                     {['Videos', 'Channels', 'Playlists'].map(tag => (
                       <span key={tag} className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-gray-50 border border-gray-100 text-gray-500">{tag}</span>
                     ))}
                   </div>
-                  {/* CTA */}
                   <div className="flex items-center justify-between pt-4 border-t border-gray-50">
                     <span className="text-xs font-semibold text-gray-400">Export: XLSX · PDF · JSON</span>
                     <span className="inline-flex items-center gap-1.5 text-sm font-bold text-red-500 group-hover:gap-2.5 transition-all">
-                      Launch <ArrowRight className="w-3.5 h-3.5" />
+                      {isExpired ? 'Upgrade' : 'Launch'} <ArrowRight className="w-3.5 h-3.5" />
                     </span>
                   </div>
                 </div>
               </div>
 
               {/* Website Scraper card */}
-              <div onClick={() => navigate('/website-scraper')}
-                className="relative bg-white rounded-2xl border border-gray-100 overflow-hidden cursor-pointer group transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:border-emerald-100"
+              <div
+                onClick={() => isExpired ? setShowUpgrade(true) : navigate('/website-scraper')}
+                className={`relative bg-white rounded-2xl border border-gray-100 overflow-hidden group transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:border-emerald-100 ${isExpired ? 'cursor-pointer opacity-50 grayscale' : 'cursor-pointer'}`}
                 style={{ boxShadow: '0 2px 8px rgba(30,27,75,0.06)' }}>
                 <div className="h-1 w-full bg-gradient-to-r from-emerald-400 to-teal-500" />
                 <div className="p-6">
@@ -430,7 +594,10 @@ export function Dashboard() {
                     <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center ring-1 ring-emerald-100">
                       <Globe className="w-6 h-6 text-emerald-500" />
                     </div>
-                    <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100 uppercase tracking-wide">Active</span>
+                    {isExpired
+                      ? <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-gray-100 text-gray-400 border border-gray-200 uppercase tracking-wide flex items-center gap-1"><Lock className="w-2.5 h-2.5" /> Locked</span>
+                      : <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100 uppercase tracking-wide">Active</span>
+                    }
                   </div>
                   <h3 className="text-[15px] font-bold text-gray-900 mb-1 leading-snug">Website Scraper</h3>
                   <p className="text-xs text-gray-400 mb-5 leading-relaxed">AI-powered B2B lead extractor — finds contacts, emails & LinkedIn.</p>
@@ -442,7 +609,7 @@ export function Dashboard() {
                   <div className="flex items-center justify-between pt-4 border-t border-gray-50">
                     <span className="text-xs font-semibold text-gray-400">Export: CSV · Excel</span>
                     <span className="inline-flex items-center gap-1.5 text-sm font-bold text-emerald-600 group-hover:gap-2.5 transition-all">
-                      Launch <ArrowRight className="w-3.5 h-3.5" />
+                      {isExpired ? 'Upgrade' : 'Launch'} <ArrowRight className="w-3.5 h-3.5" />
                     </span>
                   </div>
                 </div>
@@ -515,28 +682,105 @@ export function Dashboard() {
         </main>
       </div>
 
-      {/* ══ SUBSCRIPTION EXPIRED MODAL ══ */}
-      {showExpiredModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-8 text-center">
-            <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-5">
-              <AlertTriangle className="w-8 h-8 text-red-500" />
+      {/* ══ UPGRADE MODAL ══ */}
+      {showUpgrade && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
+          style={{ background: 'rgba(17,24,39,0.6)' }}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl relative border border-gray-100 overflow-hidden"
+            style={{ boxShadow: '0 24px 64px rgba(91,79,232,.28)' }}>
+
+            {/* Header */}
+            <div className="px-8 pt-7 pb-5 text-center border-b border-gray-100 relative"
+              style={{ background: 'linear-gradient(135deg,#f5f3ff,#fff)' }}>
+              <button onClick={() => { setShowUpgrade(false); setUpgradeMsg(null); }}
+                className="absolute top-4 right-4 w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 transition-all hover:rotate-90 duration-200">
+                <X className="w-4 h-4" />
+              </button>
+              <div className="w-14 h-14 rounded-2xl mx-auto mb-3 flex items-center justify-center"
+                style={{ background: 'linear-gradient(135deg,#5B4FE8,#7C6FEF)', boxShadow: '0 8px 24px rgba(91,79,232,.35)' }}>
+                <Sparkles className="w-7 h-7 text-white" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-1">
+                {isExpired ? 'Renew your plan' : 'Upgrade your plan'}
+              </h2>
+              <p className="text-sm text-gray-500 mb-6">Unlock unlimited scraping. Pay securely via Razorpay.</p>
+              
+              <div className="flex items-center justify-center gap-3">
+                <span className={`text-sm font-semibold transition-colors ${!yearlyBilling ? 'text-gray-900' : 'text-gray-400'}`}>Monthly</span>
+                <button 
+                  onClick={() => setYearlyBilling(!yearlyBilling)}
+                  className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none"
+                  style={{ backgroundColor: yearlyBilling ? '#5B4FE8' : '#e5e7eb' }}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${yearlyBilling ? 'translate-x-6' : 'translate-x-1'}`}
+                  />
+                </button>
+                <span className={`text-sm font-semibold flex items-center gap-1.5 transition-colors ${yearlyBilling ? 'text-gray-900' : 'text-gray-400'}`}>
+                  Yearly <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] uppercase font-bold tracking-wider">Save 16%</span>
+                </span>
+              </div>
             </div>
-            <h2 className="text-xl font-bold text-gray-900 mb-2">Subscription Expired</h2>
-            <p className="text-sm text-gray-500 mb-6">
-              Your <strong>{planLabel(plan as any)}</strong> plan has expired.
-              Upgrade to continue using Scrapify and all premium features.
-            </p>
-            <button
-              onClick={() => { setShowExpiredModal(false); navigate('/#pricing'); }}
-              className="w-full py-3 rounded-xl text-sm font-bold text-white mb-3"
-              style={{ background: 'linear-gradient(135deg,#5B4FE8,#7C6FEF)' }}>
-              Upgrade Now
-            </button>
-            <button onClick={() => setShowExpiredModal(false)}
-              className="w-full py-2.5 rounded-xl text-sm font-semibold text-gray-500 hover:text-gray-700 hover:bg-gray-50 transition-colors">
-              Maybe later
-            </button>
+
+            {upgradeMsg && (
+              <div className={`mx-6 mt-4 px-4 py-3 rounded-xl text-sm font-medium border flex items-center gap-2 ${
+                upgradeMsg.type === 'success'
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                  : 'bg-red-50 border-red-200 text-red-600'
+              }`}>
+                {upgradeMsg.type === 'success'
+                  ? <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  : <AlertTriangle className="w-4 h-4 shrink-0" />}
+                {upgradeMsg.text}
+              </div>
+            )}
+
+            {/* Plan cards */}
+            <div className="grid grid-cols-2 gap-4 p-6">
+              {UPGRADE_PLANS.map(p => {
+                const totalUsdPrice = yearlyBilling ? p.yearly.usd * 12 : p.monthly.usd;
+                const inrEquiv = Math.round(totalUsdPrice * usdToInr);
+                const usdLabel = yearlyBilling ? p.yearly.label : p.monthly.label;
+                const payButtonLabel = yearlyBilling ? p.yearly.total : p.monthly.label;
+                
+                return (
+                  <div key={p.id}
+                    className={`rounded-xl border p-5 flex flex-col relative ${p.highlight ? 'border-indigo-400 shadow-lg' : 'border-gray-200'}`}
+                    style={p.highlight ? { background: 'linear-gradient(180deg,#faf9ff,#f0eeff)' } : {}}>
+                    {p.highlight && (
+                      <span className="absolute -top-3 left-1/2 -translate-x-1/2 text-[10px] font-bold text-white px-3 py-1 rounded-full whitespace-nowrap"
+                        style={{ background: 'linear-gradient(135deg,#5B4FE8,#7C6FEF)' }}>
+                        ⭐ Recommended
+                      </span>
+                    )}
+                    <p className="text-xs font-bold text-indigo-500 uppercase tracking-widest mb-1 mt-2">{p.name}</p>
+                    <div className="flex items-end gap-1 mb-0.5">
+                      <p className="text-3xl font-bold text-gray-900 leading-none">{usdLabel}</p>
+                      <span className="text-sm font-normal text-gray-400 mb-0.5">/mo</span>
+                    </div>
+                    <p className="text-xs text-indigo-400 font-semibold mb-4">≈ ₹{inrEquiv.toLocaleString('en-IN')} {yearlyBilling ? 'charged yearly' : 'charged'}</p>
+                    <ul className="space-y-1.5 text-xs text-gray-600 mb-5 flex-1">
+                      {p.features.map(f => (
+                        <li key={f} className="flex items-start gap-2">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-indigo-400 shrink-0 mt-0.5" />{f}
+                        </li>
+                      ))}
+                    </ul>
+                    <button onClick={() => handlePay(p)} disabled={!!paying}
+                      className="w-full py-3 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-all hover:opacity-90 active:scale-95 disabled:opacity-50"
+                      style={{ background: 'linear-gradient(135deg,#5B4FE8,#7C6FEF)', boxShadow: p.highlight ? '0 4px 16px rgba(91,79,232,.38)' : 'none' }}>
+                      {paying === p.id
+                        ? <><Loader2 className="w-4 h-4 animate-spin" /> Processing…</>
+                        : <>Pay {payButtonLabel} <ArrowRight className="w-4 h-4" /></>}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="px-6 pb-5 text-center">
+              <p className="text-xs text-gray-400">🔒 Secured by Razorpay · 256-bit SSL encryption</p>
+            </div>
           </div>
         </div>
       )}
@@ -565,79 +809,9 @@ export function Dashboard() {
         </div>
       )}
 
-      {/* ══ PROFILE / SETTINGS MODAL ══ */}
+      {/* ══ PROFILE MODAL ══ */}
       {showSettings && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl relative border border-gray-100">
-            <button onClick={() => { setShowSettings(false); setIsEditingProfile(false); setProfileError(''); }}
-              className="absolute top-5 right-5 bg-gray-50 hover:bg-gray-100 p-2 rounded-full text-gray-400">
-              <X className="w-4 h-4" />
-            </button>
-            <div className="flex flex-col items-center mb-6">
-              <div className="relative w-16 h-16 mb-3">
-                <div className="w-16 h-16 rounded-full overflow-hidden ring-4 ring-indigo-100 shadow-lg">
-                  {!avatarError
-                    ? <img src="/avatar.png" alt="" className="w-full h-full object-cover" onError={() => setAvatarError(true)} />
-                    : <div className="w-full h-full flex items-center justify-center text-white font-bold text-xl" style={{ background: 'linear-gradient(135deg,#5B4FE8,#7C6FEF)' }}>{userInitials}</div>}
-                </div>
-                <span className="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 bg-emerald-400 border-2 border-white rounded-full" />
-              </div>
-              <h2 className="text-xl font-bold text-gray-900">Profile Overview</h2>
-              <p className="text-sm text-gray-400">Manage your account details</p>
-            </div>
-            {profileError && (
-              <div className="mb-4 p-3 bg-red-50 border-l-4 border-red-500 text-red-600 text-sm rounded-r-lg">{profileError}</div>
-            )}
-            {!isEditingProfile ? (
-              <div className="space-y-3">
-                <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
-                  <p className="text-xs font-bold text-indigo-500 uppercase tracking-wider mb-1">Full Name</p>
-                  <p className="text-sm font-semibold text-gray-900">{user?.full_name}</p>
-                </div>
-                <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
-                  <p className="text-xs font-bold text-indigo-500 uppercase tracking-wider mb-1">Email</p>
-                  <p className="text-sm font-semibold text-gray-900">{user?.email}</p>
-                </div>
-                <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
-                  <p className="text-xs font-bold text-indigo-500 uppercase tracking-wider mb-1">Current Plan</p>
-                  <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${planBadgeClass(plan as any)}`}>{planLabel(plan as any)}</span>
-                </div>
-                <button onClick={() => setIsEditingProfile(true)}
-                  className="w-full mt-2 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-white"
-                  style={{ background: 'linear-gradient(135deg,#5B4FE8,#7C6FEF)' }}>
-                  <Edit2 className="w-4 h-4" /> Edit Profile
-                </button>
-                {/* Logout inside profile */}
-                <button onClick={() => { setShowSettings(false); setShowLogoutConfirm(true); }}
-                  className="w-full mt-2 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-red-500 border border-red-100 hover:bg-red-50 transition-colors">
-                  <LogOut className="w-4 h-4" /> Sign Out
-                </button>
-              </div>
-            ) : (
-              <form onSubmit={handleUpdateProfile} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Full Name</label>
-                  <input type="text" value={editName} onChange={e => setEditName(e.target.value)} required placeholder="Full name"
-                    className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
-                  <input type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)} required placeholder="Email"
-                    className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500" />
-                </div>
-                <div className="flex gap-3 pt-1">
-                  <button type="button" onClick={() => { setIsEditingProfile(false); setEditName(user?.full_name||''); setEditEmail(user?.email||''); setProfileError(''); }}
-                    className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50">Cancel</button>
-                  <button type="submit" disabled={isUpdating}
-                    className="flex-1 flex justify-center items-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-60"
-                    style={{ background: 'linear-gradient(135deg,#5B4FE8,#7C6FEF)' }}>
-                    {isUpdating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Save
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
-        </div>
+        <ProfileModal onClose={() => { setShowSettings(false); }} />
       )}
     </div>
   );

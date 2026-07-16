@@ -11,7 +11,7 @@ const faqs = [
   { q: 'Is it secure?', a: 'Yes. We use industry-standard encryption for all credentials, and data is transmitted over HTTPS.' },
   { q: 'How do I create an account?', a: 'Click "Get started" and fill in your name, email, and password. No credit card required.' },
   { q: 'Is scraping legal?', a: 'Scraping publicly available data is generally legal, but always comply with the target site\'s terms of service.' },
-  { q: 'Is this free?', a: 'We offer a free forever plan with a 3-day trial. Premium plans unlock unlimited scrapes.' },
+  { q: 'Is this free?', a: 'We offer a free plan with a 3-day trial. Premium plans unlock unlimited scrapes.' },
 ];
 
 function Toast({ msg, onClose }: { msg: { type: 'success' | 'error'; text: string }; onClose: () => void }) {
@@ -322,7 +322,7 @@ export function Home() {
               See how it works
             </a>
           </div>
-          <p className="mt-4 text-xs text-gray-400">No credit card required · Free forever plan</p>
+          <p className="mt-4 text-xs text-gray-400">No credit card required · Free plan</p>
         </div>
       </section>
 
@@ -693,21 +693,27 @@ export function Home() {
           {/* Plans grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
 
-            {/* ── FREE FOREVER ── */}
-            <div className="rounded-2xl border border-gray-200 bg-white p-8" style={{ boxShadow: '0 1px 4px 0 rgba(30,27,75,0.06)' }}>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4">Free Forever</p>
-              <div className="flex items-end gap-1 mb-1">
-                <span className="text-4xl font-bold text-gray-900">$0</span>
-                <span className="text-sm text-gray-400 mb-1.5">/mo</span>
+            {/* ── FREE ── */}
+            <div 
+              onClick={() => navigate('/signup?plan=free')}
+              className="rounded-2xl border border-gray-200 bg-white p-8 h-full flex flex-col cursor-pointer hover:border-indigo-500 hover:shadow-lg transition-all" 
+              style={{ boxShadow: '0 1px 4px 0 rgba(30,27,75,0.06)' }}
+            >
+              <div className="min-h-[140px]">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4">Free</p>
+                <div className="flex items-end gap-1 mb-1">
+                  <span className="text-4xl font-bold text-gray-900">$0</span>
+                  <span className="text-sm text-gray-400 mb-1.5">/mo</span>
+                </div>
+                <p className="text-xs text-amber-500 font-semibold mb-2">3-day trial access</p>
+                <p className="text-xs text-transparent select-none mb-4">Spacer</p>
               </div>
-              <p className="text-xs text-amber-500 font-semibold mb-6">3-day trial access</p>
-              <Link
-                to="/signup"
-                className="block w-full text-center py-2.5 rounded-xl text-sm font-semibold border border-gray-200 text-gray-700 hover:bg-gray-50 transition-all mb-8"
+              <button
+                className="w-full text-center py-2.5 rounded-xl text-sm font-semibold border border-gray-200 text-gray-700 bg-gray-50 group-hover:bg-gray-100 transition-all mb-8"
               >
                 Get started free
-              </Link>
-              <ul className="space-y-3 text-sm text-gray-600">
+              </button>
+              <ul className="space-y-3 text-sm text-gray-600 flex-1">
                 {['Up to 50 scrapes', 'YouTube & Website scraper', 'CSV export', 'Community support', '3-day free trial'].map(f => (
                   <li key={f} className="flex items-start gap-2.5">
                     <Check className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />{f}
@@ -718,7 +724,8 @@ export function Home() {
 
             {/* ── BASIC — RECOMMENDED ── */}
             <div
-              className="rounded-2xl border-2 border-indigo-500 p-8 relative"
+              onClick={() => handlePay('basic', 'Basic', yearly ? 5 : 6)}
+              className="rounded-2xl border border-gray-200 p-8 relative h-full flex flex-col cursor-pointer hover:border-indigo-500 hover:shadow-lg transition-all"
               style={{ background: 'linear-gradient(180deg,#fff 0%,#f8f7ff 100%)', boxShadow: '0 8px 32px -4px rgba(91,79,232,0.18)' }}
             >
               <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
@@ -726,21 +733,22 @@ export function Home() {
                   style={{ background: 'linear-gradient(135deg,#5B4FE8,#7C6FEF)' }}>Recommended</span>
               </div>
 
-              <p className="text-xs font-semibold text-indigo-500 uppercase tracking-widest mb-4">Basic</p>
-              <div className="flex items-end gap-1 mb-1">
-                <span className="text-4xl font-bold text-gray-900">${yearly ? '5' : '6'}</span>
-                <span className="text-sm text-gray-400 mb-1.5">/mo</span>
+              <div className="min-h-[140px]">
+                <p className="text-xs font-semibold text-indigo-500 uppercase tracking-widest mb-4">Basic</p>
+                <div className="flex items-end gap-1 mb-1">
+                  <span className="text-4xl font-bold text-gray-900">${yearly ? '5' : '6'}</span>
+                  <span className="text-sm text-gray-400 mb-1.5">/mo</span>
+                </div>
+                {/* Live INR equivalent */}
+                <p className="text-xs text-indigo-400 font-semibold mb-1">
+                  {rateLoaded ? inrEquiv(yearly ? 5 : 6) + '/mo' : '…'} · charged at live rate
+                </p>
+                {yearly
+                  ? <p className="text-xs text-emerald-500 font-semibold mb-4">Billed $60/yr · Save $12</p>
+                  : <p className="text-xs text-gray-400 mb-4">Billed monthly</p>}
               </div>
-              {/* Live INR equivalent */}
-              <p className="text-xs text-indigo-400 font-semibold mb-1">
-                {rateLoaded ? inrEquiv(yearly ? 5 : 6) + '/mo' : '…'} · charged at live rate
-              </p>
-              {yearly
-                ? <p className="text-xs text-emerald-500 font-semibold mb-5">Billed $60/yr · Save $12</p>
-                : <p className="text-xs text-gray-400 mb-5">Billed monthly</p>}
 
               <button
-                onClick={() => handlePay('basic', 'Basic', yearly ? 5 : 6)}
                 disabled={!!payingPlan}
                 className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 mb-8 disabled:opacity-60 disabled:cursor-not-allowed"
                 style={{ background: 'linear-gradient(135deg,#5B4FE8,#7C6FEF)', boxShadow: '0 4px 14px rgba(91,79,232,0.35)' }}
@@ -748,7 +756,7 @@ export function Home() {
                 {payingPlan === 'basic' ? <><Loader2 className="w-4 h-4 animate-spin" /> Processing…</> : 'Get started'}
               </button>
 
-              <ul className="space-y-3 text-sm text-gray-600">
+              <ul className="space-y-3 text-sm text-gray-600 flex-1">
                 {['Unlimited scrapes', 'YouTube, Website & Map scraper', 'Excel, PDF & JSON export', 'Priority email support', 'AI-powered extraction', 'API access'].map(f => (
                   <li key={f} className="flex items-start gap-2.5">
                     <Check className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />{f}
@@ -758,29 +766,34 @@ export function Home() {
             </div>
 
             {/* ── STANDARD ── */}
-            <div className="rounded-2xl border border-gray-200 bg-white p-8" style={{ boxShadow: '0 1px 4px 0 rgba(30,27,75,0.06)' }}>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4">Standard</p>
-              <div className="flex items-end gap-1 mb-1">
-                <span className="text-4xl font-bold text-gray-900">${yearly ? '9' : '10'}</span>
-                <span className="text-sm text-gray-400 mb-1.5">/mo</span>
+            <div 
+              onClick={() => handlePay('standard', 'Standard', yearly ? 8 : 9)}
+              className="rounded-2xl border border-gray-200 bg-white p-8 h-full flex flex-col cursor-pointer hover:border-indigo-500 hover:shadow-lg transition-all" 
+              style={{ boxShadow: '0 1px 4px 0 rgba(30,27,75,0.06)' }}
+            >
+              <div className="min-h-[140px]">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4">Standard</p>
+                <div className="flex items-end gap-1 mb-1">
+                  <span className="text-4xl font-bold text-gray-900">${yearly ? '8' : '9'}</span>
+                  <span className="text-sm text-gray-400 mb-1.5">/mo</span>
+                </div>
+                {/* Live INR equivalent */}
+                <p className="text-xs text-indigo-400 font-semibold mb-1">
+                  {rateLoaded ? inrEquiv(yearly ? 8 : 9) + '/mo' : '…'} · charged at live rate
+                </p>
+                {yearly
+                  ? <p className="text-xs text-emerald-500 font-semibold mb-4">Billed $96/yr · Save $12</p>
+                  : <p className="text-xs text-gray-400 mb-4">Billed monthly</p>}
               </div>
-              {/* Live INR equivalent */}
-              <p className="text-xs text-indigo-400 font-semibold mb-1">
-                {rateLoaded ? inrEquiv(yearly ? 9 : 10) + '/mo' : '…'} · charged at live rate
-              </p>
-              {yearly
-                ? <p className="text-xs text-emerald-500 font-semibold mb-5">Billed $108/yr · Save $12</p>
-                : <p className="text-xs text-gray-400 mb-5">Billed monthly</p>}
 
               <button
-                onClick={() => handlePay('standard', 'Standard', yearly ? 9 : 10)}
                 disabled={!!payingPlan}
-                className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-bold border border-gray-200 text-gray-700 hover:bg-gray-50 transition-all mb-8 disabled:opacity-60 disabled:cursor-not-allowed"
+                className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-bold border border-gray-200 text-gray-700 bg-gray-50 group-hover:bg-gray-100 transition-all mb-8 disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {payingPlan === 'standard' ? <><Loader2 className="w-4 h-4 animate-spin" /> Processing…</> : 'Get started'}
               </button>
 
-              <ul className="space-y-3 text-sm text-gray-600">
+              <ul className="space-y-3 text-sm text-gray-600 flex-1">
                 {['Everything in Basic', 'Unlimited team members', 'Advanced analytics', 'Custom export templates', 'Dedicated account manager', 'SLA guarantee', 'White-label exports'].map(f => (
                   <li key={f} className="flex items-start gap-2.5">
                     <Check className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />{f}
@@ -816,7 +829,7 @@ export function Home() {
             </Link>
           </div>
           <div className="flex items-center justify-center gap-6 mt-6 text-xs text-indigo-200">
-            <span className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5" /> Free forever plan</span>
+            <span className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5" /> Free plan</span>
             <span className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5" /> No credit card</span>
             <span className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5" /> Cancel anytime</span>
           </div>

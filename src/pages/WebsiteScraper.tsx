@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useSubscription, planLabel, planBadgeClass } from '../contexts/SubscriptionContext';
 import { TrialGate } from '../components/TrialGate';
+import { ProfileModal } from '../components/ProfileModal';
 import { GoogleGenAI } from '@google/genai';
 import {
   MapPin, Search, Loader2, ExternalLink, Navigation, Download, Trash2,
@@ -174,7 +175,7 @@ export function WebsiteScraper() {
   const navigate   = useNavigate();
   const location   = useLocation();
   const { user, signOut } = useAuth();
-  const { plan, can_scrape } = useSubscription() as any;
+  const { plan, can_scrape, loading: subLoading } = useSubscription() as any;
 
   const [avatarError, setAvatarError]     = useState(false);
   const [showSettings, setShowSettings]   = useState(false);
@@ -543,20 +544,29 @@ export function WebsiteScraper() {
           </div>
         </nav>
         {!sidebarCollapsed && (
-          <div className={`mx-3 mb-3 rounded-xl px-3.5 py-3 border ${isPaid ? 'bg-indigo-50 border-indigo-100' : 'bg-amber-50 border-amber-100'}`}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <Crown className={`w-3.5 h-3.5 ${isPaid ? 'text-indigo-500' : 'text-amber-500'}`} />
-                <span className={`text-xs font-bold ${isPaid ? 'text-indigo-700' : 'text-amber-700'}`}>{planLabel(plan as any)}</span>
+          <div className={`mx-3 mb-3 rounded-xl px-3.5 py-3 border ${subLoading ? 'bg-gray-50 border-gray-100' : isPaid ? 'bg-indigo-50 border-indigo-100' : 'bg-amber-50 border-amber-100'}`}>
+            {subLoading ? (
+              <div className="flex items-center gap-2 py-0.5">
+                <div className="w-3.5 h-3.5 rounded-full bg-gray-200 animate-pulse shrink-0" />
+                <div className="h-3 w-16 bg-gray-200 rounded animate-pulse" />
               </div>
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isExpired ? 'bg-red-100 text-red-600' : isPaid ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                {isExpired ? 'Expired' : 'Active'}
-              </span>
-            </div>
-            {!isPaid && !isExpired && (
-              <button onClick={() => navigate('/#pricing')}
-                className="w-full mt-2.5 text-[11px] font-bold text-white py-1.5 rounded-lg hover:opacity-90 transition-opacity"
-                style={{ background: 'linear-gradient(135deg,#5B4FE8,#7C6FEF)' }}>Upgrade Plan</button>
+            ) : (
+              <>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Crown className={`w-3.5 h-3.5 ${isPaid ? 'text-indigo-500' : 'text-amber-500'}`} />
+                    <span className={`text-xs font-bold ${isPaid ? 'text-indigo-700' : 'text-amber-700'}`}>{planLabel(plan as any)}</span>
+                  </div>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isExpired ? 'bg-red-100 text-red-600' : isPaid ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                    {isExpired ? 'Expired' : 'Active'}
+                  </span>
+                </div>
+                {!isPaid && !isExpired && (
+                  <button onClick={() => navigate('/#pricing')}
+                    className="w-full mt-2.5 text-[11px] font-bold text-white py-1.5 rounded-lg hover:opacity-90 transition-opacity"
+                    style={{ background: 'linear-gradient(135deg,#5B4FE8,#7C6FEF)' }}>Upgrade Plan</button>
+                )}
+              </>
             )}
           </div>
         )}
@@ -581,9 +591,12 @@ export function WebsiteScraper() {
               <span className="absolute top-2 right-2 w-[5px] h-[5px] bg-red-500 rounded-full ring-1 ring-white" />
             </button>
             <div className="w-px h-5 bg-gray-200 mx-1" />
-            <span className={`hidden sm:inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1.5 rounded-lg border ${planBadgeClass(plan as any)}`}>
-              <Crown className="w-3 h-3" />{planLabel(plan as any)}
-            </span>
+            {subLoading
+              ? <span className="hidden sm:inline-flex w-16 h-6 rounded-lg bg-gray-100 animate-pulse" />
+              : <span className={`hidden sm:inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1.5 rounded-lg border ${planBadgeClass(plan as any)}`}>
+                  <Crown className="w-3 h-3" />{planLabel(plan as any)}
+                </span>
+            }
             <div className="w-px h-5 bg-gray-200 mx-1" />
             <button onClick={() => setShowSettings(true)}
               className="flex items-center gap-2 pl-1.5 pr-3 py-1.5 rounded-xl hover:bg-gray-50 border border-transparent hover:border-gray-200 transition-all">
@@ -1054,23 +1067,8 @@ export function WebsiteScraper() {
         </main>
       </div>{/* end flex-1 main col */}
 
-      {/* Logout confirm */}
-      {showLogoutConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl p-8 max-w-sm w-full shadow-2xl relative">
-            <button onClick={() => setShowLogoutConfirm(false)} className="absolute top-4 right-4 bg-gray-100 hover:bg-gray-200 p-2 rounded-full text-gray-500"><X className="w-4 h-4" /></button>
-            <div className="text-center">
-              <div className="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4"><LogOut className="w-7 h-7 text-red-500" /></div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Sign Out</h3>
-              <p className="text-sm text-gray-500 mb-6">Are you sure you want to sign out?</p>
-              <div className="flex gap-3">
-                <button onClick={() => setShowLogoutConfirm(false)} className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50">Cancel</button>
-                <button onClick={() => signOut().then(() => navigate('/'))} className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white bg-red-500 hover:bg-red-600">Sign Out</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Profile / Settings modal */}
+      {showSettings && <ProfileModal onClose={() => setShowSettings(false)} />}
     </div>{/* end flex h-screen */}
     </TrialGate>
   );
