@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRight, Youtube, Globe, Map, Shield, Zap, Download, Bot, CheckCircle2, ChevronDown, ChevronUp, Check, Loader2, X, CreditCard, User, Lock } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -154,6 +154,26 @@ function PostPaymentModal({
   );
 }
 
+function ScrollReveal({ children }: { children: React.ReactNode }) {
+  const [visible, setVisible] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const obs = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        setVisible(true);
+        obs.unobserve(entry.target);
+      }
+    }, { threshold: 0.05 });
+    if (ref.current) obs.observe(ref.current);
+    return () => obs.disconnect();
+  }, []);
+  return (
+    <div ref={ref} className={`transition-all duration-1000 ease-out transform ${visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+      {children}
+    </div>
+  );
+}
+
 export function Home() {
   const navigate = useNavigate();
   const [openFaq, setOpenFaq]       = useState<number | null>(0);
@@ -226,6 +246,145 @@ export function Home() {
 
   return (
     <div className="min-h-screen bg-white" style={{ fontFamily: 'ui-sans-serif, system-ui, sans-serif' }}>
+      <style>{`
+        :root {
+          --themesamplecolor: #4F46E5;
+        }
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        @keyframes float {
+          0%, 100% {
+            transform: translateY(0);
+          }
+          50% {
+            transform: translateY(-8px);
+          }
+        }
+        @keyframes pulseGlow {
+          0%, 100% {
+            opacity: 0.15;
+            transform: scale(1);
+          }
+          50% {
+            opacity: 0.28;
+            transform: scale(1.04);
+          }
+        }
+        @keyframes blobFloat1 {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          33% { transform: translate(30px, -50px) scale(1.08); }
+          66% { transform: translate(-20px, 20px) scale(0.95); }
+        }
+        @keyframes blobFloat2 {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          50% { transform: translate(-40px, 40px) scale(1.12); }
+        }
+        .animate-blob-1 {
+          animation: blobFloat1 15s ease-in-out infinite;
+        }
+        .animate-blob-2 {
+          animation: blobFloat2 18s ease-in-out infinite;
+        }
+        .animate-fade-in-up {
+          animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+        .animate-float {
+          animation: float 5s ease-in-out infinite;
+        }
+        .animate-pulse-glow {
+          animation: pulseGlow 6s ease-in-out infinite;
+        }
+        .delay-100 { animation-delay: 100ms; }
+        .delay-200 { animation-delay: 200ms; }
+        .delay-300 { animation-delay: 300ms; }
+
+        /* Premium buttons */
+        .btn-premium {
+          background: linear-gradient(135deg, #4F46E5 0%, #7C6FEF 100%);
+          color: white !important;
+          border: 1px solid transparent;
+          box-shadow: 0 4px 14px rgba(79, 70, 229, 0.2);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        }
+        .btn-premium:hover {
+          background: white !important;
+          transform: translateY(-2px);
+          box-shadow: 0 8px 20px rgba(79, 70, 229, 0.25);
+          border: 1px solid var(--themesamplecolor);
+          text-decoration: none;
+          color: var(--themesamplecolor) !important;
+          animation: none;
+        }
+        .btn-outline-premium {
+          background: white !important;
+          color: #4F46E5 !important;
+          border: 1px solid #D1D5DB;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        }
+        .btn-outline-premium:hover {
+          background: white !important;
+          transform: translateY(-2px);
+          box-shadow: 0 8px 20px rgba(79, 70, 229, 0.16);
+          border: 1px solid var(--themesamplecolor);
+          text-decoration: none;
+          color: var(--themesamplecolor) !important;
+        }
+
+        /* Scraper hover glow effects */
+        .scraper-card {
+          position: relative;
+          overflow: hidden;
+          transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1) !important;
+        }
+        .scraper-card::after {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: -150%;
+          width: 50%;
+          height: 100%;
+          background: linear-gradient(to right, rgba(255,255,255,0) 0%, rgba(255,255,255,0.25) 100%);
+          transform: skewX(-25deg);
+          transition: 0.75s;
+        }
+        .scraper-card:hover::after {
+          left: 150%;
+        }
+        .scraper-card:hover {
+          transform: translateY(-6px);
+        }
+        .card-yt:hover {
+          box-shadow: 0 20px 40px rgba(239, 68, 68, 0.08) !important;
+          border-color: rgba(239, 68, 68, 0.2) !important;
+        }
+        .card-ws:hover {
+          box-shadow: 0 20px 40px rgba(16, 185, 129, 0.08) !important;
+          border-color: rgba(16, 185, 129, 0.2) !important;
+        }
+        .card-ms:hover {
+          box-shadow: 0 20px 40px rgba(79, 70, 229, 0.08) !important;
+          border-color: rgba(79, 70, 229, 0.2) !important;
+        }
+
+        /* Hover lift card animation */
+        .hover-lift {
+          transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+        }
+        .hover-lift:hover {
+          transform: translateY(-4px);
+          box-shadow: 0 12px 30px rgba(79, 70, 229, 0.08) !important;
+          border-color: rgba(79, 70, 229, 0.15) !important;
+        }
+      `}</style>
 
       {/* ── TOAST ── */}
       {toast && <Toast msg={toast} onClose={dismissToast} />}
@@ -274,8 +433,7 @@ export function Home() {
             </Link>
             <Link
               to="/signup"
-              className="text-sm font-semibold text-white px-4 py-1.5 rounded-md transition-all hover:opacity-90"
-              style={{ background: 'linear-gradient(135deg, #5B4FE8 0%, #7C6FEF 100%)' }}
+              className="text-sm font-semibold px-4 py-1.5 rounded-md btn-premium"
             >
               Get started
             </Link>
@@ -291,38 +449,41 @@ export function Home() {
         }}
       >
         <div className="bg-grid absolute inset-0 pointer-events-none" />
+
+        {/* Floating background gradient blobs */}
+        <div className="absolute top-12 left-10 w-72 h-72 rounded-full bg-indigo-300/10 blur-3xl animate-blob-1 pointer-events-none" />
+        <div className="absolute bottom-20 right-10 w-80 h-80 rounded-full bg-emerald-300/10 blur-3xl animate-blob-2 pointer-events-none" />
         <div className="relative max-w-6xl mx-auto px-6 pt-24 pb-28 text-center">
           {/* Badge */}
-          <div className="inline-flex items-center gap-2 bg-white border border-gray-200 rounded-full px-3 py-1 text-xs text-gray-500 font-medium mb-8 shadow-sm">
+          <div className="inline-flex items-center gap-2 bg-white border border-gray-200 rounded-full px-3 py-1 text-xs text-gray-500 font-medium mb-8 shadow-sm animate-fade-in-up">
             <Bot className="w-3.5 h-3.5 text-indigo-500" />
             AI-powered data extraction · Now with Gemini 2.5
           </div>
 
-          <h1 className="text-5xl md:text-6xl font-bold text-gray-900 leading-[1.08] mb-4 tracking-tight">
+          <h1 className="text-5xl md:text-6xl font-bold text-gray-900 leading-[1.08] mb-4 tracking-tight animate-fade-in-up delay-100">
             All-in-one data scraper
             <br />
             <span style={{ color: '#5B4FE8' }}>for modern teams.</span>
           </h1>
-          <p className="text-lg text-gray-500 max-w-xl mx-auto mb-10 leading-relaxed">
+          <p className="text-lg text-gray-500 max-w-xl mx-auto mb-10 leading-relaxed animate-fade-in-up delay-200">
             Extract structured data from YouTube, websites, and maps in seconds. Secure, fast, and beautifully simple.
           </p>
 
-          <div className="flex items-center justify-center gap-3 flex-wrap">
+          <div className="flex items-center justify-center gap-3 flex-wrap animate-fade-in-up delay-300">
             <Link
               to="/signup"
-              className="inline-flex items-center gap-2 text-white font-semibold px-6 py-3 rounded-lg text-sm transition-all hover:opacity-90 hover:shadow-lg"
-              style={{ background: 'linear-gradient(135deg, #5B4FE8 0%, #7C6FEF 100%)' }}
+              className="inline-flex items-center gap-2 font-semibold px-6 py-3 rounded-lg text-sm btn-premium"
             >
               Get started free <ArrowRight className="w-4 h-4" />
             </Link>
             <a
               href="#how-it-works"
-              className="inline-flex items-center gap-2 text-gray-700 font-semibold px-6 py-3 rounded-lg text-sm bg-white border border-gray-200 hover:bg-gray-50 transition-all"
+              className="inline-flex items-center gap-2 font-semibold px-6 py-3 rounded-lg text-sm btn-outline-premium"
             >
               See how it works
             </a>
           </div>
-          <p className="mt-4 text-xs text-gray-400">No credit card required · Free plan</p>
+          <p className="mt-4 text-xs text-gray-400 animate-fade-in-up delay-300">No credit card required · Free plan</p>
         </div>
       </section>
 
@@ -342,7 +503,8 @@ export function Home() {
 
       {/* ── SCRAPERS ── */}
       <section id="scrapers" className="py-24 bg-white">
-        <div className="max-w-6xl mx-auto px-6">
+        <ScrollReveal>
+          <div className="max-w-6xl mx-auto px-6">
           <div className="text-center mb-14">
             <p className="text-xs font-semibold tracking-widest text-indigo-500 uppercase mb-3">Scrapers</p>
             <h2 className="text-4xl font-bold text-gray-900 mb-3">One platform. Every source.</h2>
@@ -372,30 +534,37 @@ export function Home() {
                 desc: 'Extract location data, business info, and reviews from map services.',
                 link: '/login',
               },
-            ].map(item => (
-              <Link
-                key={item.title}
-                to={item.link}
-                className="group rounded-2xl border border-gray-100 p-7 hover:shadow-md transition-all hover:border-indigo-100"
-                style={{
-                  background: 'linear-gradient(180deg, oklch(100% 0 0) 0%, oklch(98.5% .005 255) 100%)',
-                  boxShadow: '0 1px 4px 0 oklch(0.21 0.05 264 / 0.05)',
-                }}
-              >
-                <div className={`w-10 h-10 rounded-xl ${item.bg} flex items-center justify-center mb-5`}>
-                  {item.icon}
-                </div>
-                <h3 className="font-bold text-gray-900 mb-2">{item.title}</h3>
-                <p className="text-sm text-gray-500 leading-relaxed">{item.desc}</p>
-              </Link>
-            ))}
+            ].map(item => {
+              const cardClass = item.title.includes('YouTube') ? 'card-yt'
+                : item.title.includes('Website') ? 'card-ws'
+                : 'card-ms';
+              return (
+                <Link
+                  key={item.title}
+                  to={item.link}
+                  className={`group rounded-2xl border border-gray-100 p-7 scraper-card ${cardClass}`}
+                  style={{
+                    background: 'linear-gradient(180deg, oklch(100% 0 0) 0%, oklch(98.5% .005 255) 100%)',
+                    boxShadow: '0 1px 4px 0 oklch(0.21 0.05 264 / 0.05)',
+                  }}
+                >
+                  <div className={`w-10 h-10 rounded-xl ${item.bg} flex items-center justify-center mb-5`}>
+                    {item.icon}
+                  </div>
+                  <h3 className="font-bold text-gray-900 mb-2">{item.title}</h3>
+                  <p className="text-sm text-gray-500 leading-relaxed">{item.desc}</p>
+                </Link>
+              );
+            })}
           </div>
         </div>
+        </ScrollReveal>
       </section>
 
       {/* ── HOW IT WORKS ── */}
       <section id="how-it-works" className="py-24" style={{ background: 'oklch(0.985 0.005 250)' }}>
-        <div className="max-w-6xl mx-auto px-6">
+        <ScrollReveal>
+          <div className="max-w-6xl mx-auto px-6">
           <div className="text-center mb-14">
             <p className="text-xs font-semibold tracking-widest text-indigo-500 uppercase mb-3">How It Works</p>
             <h2 className="text-4xl font-bold text-gray-900 mb-3">From URL to insight in four steps</h2>
@@ -421,11 +590,13 @@ export function Home() {
             ))}
           </div>
         </div>
+        </ScrollReveal>
       </section>
 
       {/* ── FEATURES ── */}
       <section id="features" className="py-24 bg-white">
-        <div className="max-w-6xl mx-auto px-6">
+        <ScrollReveal>
+          <div className="max-w-6xl mx-auto px-6">
           <div className="text-center mb-14">
             <p className="text-xs font-semibold tracking-widest text-indigo-500 uppercase mb-3">Features</p>
             <h2 className="text-4xl font-bold text-gray-900 mb-3">Everything you need for data extraction</h2>
@@ -455,6 +626,7 @@ export function Home() {
             ))}
           </div>
         </div>
+        </ScrollReveal>
       </section>
 
       {/* ── PRODUCT PREVIEW ── */}
@@ -472,11 +644,11 @@ export function Home() {
           <p className="text-base mb-14" style={{ color: 'oklch(0.52 0.03 257)' }}>Clean, fast, and built for focus.</p>
 
           {/* Outer glow wrapper — relative so the blur pseudo sits behind the card */}
-          <div className="relative mt-14 max-w-3xl mx-auto">
+          <div className="relative mt-14 max-w-3xl mx-auto animate-fade-in-up delay-300 animate-float">
 
             {/* Brand gradient glow blob — absolute, behind the card */}
             <div
-              className="absolute inset-x-8 -top-8 -bottom-8 rounded-3xl"
+              className="absolute inset-x-8 -top-8 -bottom-8 rounded-3xl animate-pulse-glow"
               style={{
                 background: 'linear-gradient(135deg, oklch(54% .22 277) 0%, oklch(66% .21 290) 100%)',
                 opacity: 0.2,
@@ -604,7 +776,8 @@ export function Home() {
       </section>
       {/* ── TESTIMONIALS ── */}
       <section className="py-24 bg-white">
-        <div className="max-w-6xl mx-auto px-6">
+        <ScrollReveal>
+          <div className="max-w-6xl mx-auto px-6">
           <h2 className="text-3xl font-bold text-gray-900 text-center mb-12">What our customers say</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {[
@@ -614,7 +787,7 @@ export function Home() {
             ].map(t => (
               <div
                 key={t.name}
-                className="rounded-2xl border border-gray-100 p-7"
+                className="rounded-2xl border border-gray-100 p-7 hover-lift"
                 style={{
                   background: 'linear-gradient(180deg, oklch(100% 0 0) 0%, oklch(98.5% .005 255) 100%)',
                   boxShadow: '0 1px 4px 0 oklch(0.21 0.05 264 / 0.05)',
@@ -634,18 +807,20 @@ export function Home() {
             ))}
           </div>
         </div>
+        </ScrollReveal>
       </section>
 
       {/* ── FAQ ── */}
       <section id="faq" className="py-24" style={{ background: 'oklch(0.985 0.005 250)' }}>
-        <div className="max-w-2xl mx-auto px-6">
+        <ScrollReveal>
+          <div className="max-w-2xl mx-auto px-6">
           <div className="text-center mb-12">
             <p className="text-xs font-semibold tracking-widest text-indigo-500 uppercase mb-3">FAQ</p>
             <h2 className="text-4xl font-bold text-gray-900">Frequently asked questions</h2>
           </div>
           <div className="space-y-2">
             {faqs.map((item, i) => (
-              <div key={i} className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+              <div key={i} className="rounded-xl border border-gray-200 bg-white overflow-hidden hover-lift">
                 <button
                   className="w-full flex items-center justify-between px-5 py-4 text-left"
                   onClick={() => setOpenFaq(openFaq === i ? null : i)}
@@ -664,11 +839,13 @@ export function Home() {
             ))}
           </div>
         </div>
+        </ScrollReveal>
       </section>
 
       {/* ── PRICING ── */}
       <section id="pricing" className="py-24 bg-white">
-        <div className="max-w-5xl mx-auto px-6">
+        <ScrollReveal>
+          <div className="max-w-5xl mx-auto px-6">
           <div className="text-center mb-12">
             <p className="text-xs font-semibold tracking-widest text-indigo-500 uppercase mb-3">Pricing</p>
             <h2 className="text-4xl font-bold text-gray-900 mb-3">Simple, transparent pricing</h2>
@@ -709,7 +886,7 @@ export function Home() {
                 <p className="text-xs text-transparent select-none mb-4">Spacer</p>
               </div>
               <button
-                className="w-full text-center py-2.5 rounded-xl text-sm font-semibold border border-gray-200 text-gray-700 bg-gray-50 group-hover:bg-gray-100 transition-all mb-8"
+                className="w-full text-center py-2.5 rounded-xl text-sm font-semibold btn-outline-premium mb-8"
               >
                 Get started free
               </button>
@@ -750,8 +927,7 @@ export function Home() {
 
               <button
                 disabled={!!payingPlan}
-                className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 mb-8 disabled:opacity-60 disabled:cursor-not-allowed"
-                style={{ background: 'linear-gradient(135deg,#5B4FE8,#7C6FEF)', boxShadow: '0 4px 14px rgba(91,79,232,0.35)' }}
+                className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-bold btn-premium mb-8 disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {payingPlan === 'basic' ? <><Loader2 className="w-4 h-4 animate-spin" /> Processing…</> : 'Get started'}
               </button>
@@ -788,7 +964,7 @@ export function Home() {
 
               <button
                 disabled={!!payingPlan}
-                className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-bold border border-gray-200 text-gray-700 bg-gray-50 group-hover:bg-gray-100 transition-all mb-8 disabled:opacity-60 disabled:cursor-not-allowed"
+                className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-bold btn-outline-premium mb-8 disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {payingPlan === 'standard' ? <><Loader2 className="w-4 h-4 animate-spin" /> Processing…</> : 'Get started'}
               </button>
@@ -804,11 +980,13 @@ export function Home() {
 
           </div>
         </div>
+        </ScrollReveal>
       </section>
 
       {/* ── CTA BANNER ── */}
       <section className="py-16 px-6">
-        <div
+        <ScrollReveal>
+          <div
           className="max-w-4xl mx-auto rounded-2xl px-10 py-14 text-center text-white"
           style={{ background: 'linear-gradient(135deg, #5B4FE8 0%, #7C6FEF 100%)' }}
         >
@@ -817,13 +995,13 @@ export function Home() {
           <div className="flex items-center justify-center gap-3 flex-wrap">
             <Link
               to="/signup"
-              className="inline-flex items-center gap-2 bg-white text-indigo-700 font-semibold px-6 py-2.5 rounded-lg text-sm hover:bg-indigo-50 transition-all"
+              className="inline-flex items-center gap-2 bg-white text-indigo-700 font-semibold px-6 py-2.5 rounded-lg text-sm hover:bg-indigo-50 hover:-translate-y-0.5 hover:shadow-lg transition-all"
             >
               Start free <ArrowRight className="w-4 h-4" />
             </Link>
             <Link
               to="/login"
-              className="inline-flex items-center gap-2 border border-white/40 text-white font-semibold px-6 py-2.5 rounded-lg text-sm hover:bg-white/10 transition-all"
+              className="inline-flex items-center gap-2 border border-white/40 text-white font-semibold px-6 py-2.5 rounded-lg text-sm hover:bg-white hover:text-indigo-600 hover:-translate-y-0.5 hover:shadow-lg transition-all"
             >
               Sign in
             </Link>
@@ -834,10 +1012,11 @@ export function Home() {
             <span className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5" /> Cancel anytime</span>
           </div>
         </div>
+        </ScrollReveal>
       </section>
 
       {/* ── FOOTER ── */}
-      <footer id="contact" className="border-t border-gray-100 bg-white py-14">
+      <footer id="contact" className="border-t border-gray-100 bg-[#FAF9FF] py-16 text-gray-500">
         <div className="max-w-6xl mx-auto px-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-10 mb-10">
             {/* Brand */}
@@ -845,33 +1024,33 @@ export function Home() {
               <div className="flex items-center gap-2 mb-4">
                 <img src="/scrapify.png" alt="Scrapify" className="h-14 w-auto object-contain" />
               </div>
-              <p className="text-sm text-gray-400 leading-relaxed max-w-xs">
+              <p className="text-sm text-gray-400 leading-relaxed max-w-xs mt-3">
                 The professional data extraction platform. Built for modern teams who move fast.
               </p>
             </div>
 
             {/* Product */}
             <div>
-              <h4 className="text-sm font-semibold text-gray-900 mb-4">Product</h4>
-              <ul className="space-y-2.5 text-sm text-gray-400">
-                <li><a href="#features" className="hover:text-gray-700 transition-colors">Features</a></li>
-                <li><a href="#how-it-works" className="hover:text-gray-700 transition-colors">How it works</a></li>
-                <li><a href="#faq" className="hover:text-gray-700 transition-colors">FAQ</a></li>
+              <h4 className="text-xs font-bold text-gray-800 uppercase tracking-widest mb-5">Product</h4>
+              <ul className="space-y-3.5 text-sm text-gray-400">
+                <li><a href="#features" className="hover:text-indigo-600 transition-colors">Features</a></li>
+                <li><a href="#how-it-works" className="hover:text-indigo-600 transition-colors">How it works</a></li>
+                <li><a href="#faq" className="hover:text-indigo-600 transition-colors">FAQ</a></li>
               </ul>
             </div>
 
             {/* Company */}
             <div>
-              <h4 className="text-sm font-semibold text-gray-900 mb-4">Company</h4>
-              <ul className="space-y-2.5 text-sm text-gray-400">
-                <li><a href="#" className="hover:text-gray-700 transition-colors">About</a></li>
-                <li><a href="#" className="hover:text-gray-700 transition-colors">Privacy</a></li>
-                <li><a href="mailto:support@scrapify.com" className="hover:text-gray-700 transition-colors">support@scrapify.com</a></li>
+              <h4 className="text-xs font-bold text-gray-800 uppercase tracking-widest mb-5">Company</h4>
+              <ul className="space-y-3.5 text-sm text-gray-400">
+                <li><a href="#" className="hover:text-indigo-600 transition-colors">About</a></li>
+                <li><a href="#" className="hover:text-indigo-600 transition-colors">Privacy</a></li>
+                <li><a href="mailto:support@scrapify.com" className="hover:text-indigo-600 transition-colors">support@scrapify.com</a></li>
               </ul>
             </div>
           </div>
 
-          <div className="pt-8 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-2">
+          <div className="pt-8 border-t border-gray-200/60 flex flex-col sm:flex-row items-center justify-between gap-2">
             <p className="text-xs text-gray-400">© 2026 Scrapify. All rights reserved.</p>
             <p className="text-xs text-gray-400">Crafted for data teams.</p>
           </div>

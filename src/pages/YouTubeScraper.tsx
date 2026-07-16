@@ -240,48 +240,53 @@ export function YouTubeScraper() {
     <div className="flex h-screen overflow-hidden" style={{ fontFamily: 'Inter,ui-sans-serif,system-ui,sans-serif', background: 'linear-gradient(135deg,#f0f4ff 0%,#f8faff 45%,#f0fdf8 100%)' }}>
 
       {/* ══ SIDEBAR ══ */}
-      <aside className={`flex flex-col bg-white border-r border-gray-200 transition-all duration-300 ease-in-out shrink-0 ${sidebarCollapsed ? 'w-[72px]' : 'w-[252px]'}`}>
-        <div className={`flex items-center h-[64px] shrink-0 border-b border-gray-100 ${sidebarCollapsed ? 'justify-center' : 'px-5'}`}>
+      <aside className={`flex flex-col bg-white border-r border-gray-100 transition-all duration-300 ease-in-out shrink-0 ${sidebarCollapsed ? 'w-[72px]' : 'w-[260px]'}`}
+        style={{ boxShadow: '2px 0 20px rgba(0,0,0,0.035)' }}>
+        <div className={`flex items-center h-[72px] shrink-0 border-b border-gray-200 ${sidebarCollapsed ? 'justify-center px-3' : 'px-5'}`}>
           {sidebarCollapsed
-            ? <img src="/scrapify.png" alt="S" className="h-9 w-9 object-contain" />
-            : <img src="/scrapify.png" alt="Scrapify" className="h-11 w-auto object-contain max-w-[180px]" />}
+            ? <img src="/scrapify.png" alt="S" className="h-10 w-10 object-contain" />
+            : <img src="/scrapify.png" alt="Scrapify" className="h-[52px] w-auto object-contain max-w-[200px]" />}
         </div>
-        <nav className="flex-1 overflow-y-auto px-3 pt-5 pb-2">
-          {!sidebarCollapsed && <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.14em] px-2 mb-1.5">Workspace</p>}
-          <div className="space-y-0.5 mb-5">
-            {navItems.map(item => {
-              const active = location.pathname === item.path;
-              const Icon = item.icon;
-              return (
-                <button key={item.path} onClick={() => navigate(item.path)}
-                  title={sidebarCollapsed ? item.label : undefined}
-                  className={`w-full flex items-center h-9 rounded-lg text-[13px] font-medium transition-all duration-150
-                    ${sidebarCollapsed ? 'justify-center' : 'gap-2.5 px-2.5'}
-                    ${active ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'}`}>
-                  <Icon className={`w-[17px] h-[17px] shrink-0 ${active ? 'text-white' : item.iColor}`} />
-                  {!sidebarCollapsed && <span className="truncate leading-none">{item.label}</span>}
-                </button>
-              );
-            })}
+        <nav className="flex-1 overflow-y-auto px-3 pt-6 pb-2 space-y-6">
+          <div>
+            {!sidebarCollapsed && <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.18em] px-2 mb-2">Workspace</p>}
+            <div className="space-y-1">
+              {navItems.map(item => {
+                const active = location.pathname === item.path;
+                const Icon = item.icon;
+                return (
+                  <button key={item.path} onClick={() => navigate(item.path)}
+                    title={sidebarCollapsed ? item.label : undefined}
+                    className={`w-full flex items-center h-10 rounded-xl text-[13px] font-semibold transition-all duration-150
+                      ${sidebarCollapsed ? 'justify-center' : 'gap-3 px-3'}
+                      ${active ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800'}`}>
+                    <Icon className={`w-[18px] h-[18px] shrink-0 ${active ? 'text-white' : item.iColor}`} />
+                    {!sidebarCollapsed && <span className="truncate leading-none">{item.label}</span>}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-          {!sidebarCollapsed && <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.14em] px-2 mb-1.5">Account</p>}
-          <div className="space-y-0.5">
-            {[{ label:'Profile', icon: User, iColor:'text-indigo-400' }, { label:'Settings', icon: Settings, iColor:'text-gray-400' }].map(item => {
-              const Icon = item.icon;
-              return (
-                <button key={item.label} title={sidebarCollapsed ? item.label : undefined}
-                  onClick={() => setShowSettings(true)}
-                  className={`w-full flex items-center h-9 rounded-lg text-[13px] font-medium text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition-all duration-150
-                    ${sidebarCollapsed ? 'justify-center' : 'gap-2.5 px-2.5'}`}>
-                  <Icon className={`w-[17px] h-[17px] shrink-0 ${item.iColor}`} />
-                  {!sidebarCollapsed && <span className="leading-none">{item.label}</span>}
-                </button>
-              );
-            })}
+          <div>
+            {!sidebarCollapsed && <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.18em] px-2 mb-2">Account</p>}
+            <div className="space-y-1">
+              {[{ label:'Profile', icon: User, iColor:'text-indigo-400' }, { label:'Settings', icon: Settings, iColor:'text-gray-400' }].map(item => {
+                const Icon = item.icon;
+                return (
+                  <button key={item.label} title={sidebarCollapsed ? item.label : undefined}
+                    onClick={() => setShowSettings(true)}
+                    className={`w-full flex items-center h-10 rounded-xl text-[13px] font-semibold text-gray-500 hover:bg-gray-50 hover:text-gray-800 transition-all duration-150
+                      ${sidebarCollapsed ? 'justify-center' : 'gap-3 px-3'}`}>
+                    <Icon className={`w-[18px] h-[18px] shrink-0 ${item.iColor}`} />
+                    {!sidebarCollapsed && <span className="leading-none">{item.label}</span>}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </nav>
         {!sidebarCollapsed && (
-          <div className={`mx-3 mb-3 rounded-xl px-3.5 py-3 border ${subLoading ? 'bg-gray-50 border-gray-100' : isPaid ? 'bg-indigo-50 border-indigo-100' : 'bg-amber-50 border-amber-100'}`}>
+          <div className={`mx-3 mb-3 rounded-2xl px-4 py-3.5 border ${subLoading ? 'bg-gray-50 border-gray-100' : isPaid ? 'bg-gradient-to-br from-indigo-50 to-indigo-50/50 border-indigo-100' : 'bg-gradient-to-br from-amber-50 to-amber-50/50 border-amber-100'}`}>
             {subLoading ? (
               <div className="flex items-center gap-2 py-0.5">
                 <div className="w-3.5 h-3.5 rounded-full bg-gray-200 animate-pulse shrink-0" />
@@ -289,10 +294,12 @@ export function YouTubeScraper() {
               </div>
             ) : (
               <>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <Crown className={`w-3.5 h-3.5 ${isPaid ? 'text-indigo-500' : 'text-amber-500'}`} />
-                    <span className={`text-xs font-bold ${isPaid ? 'text-indigo-700' : 'text-amber-700'}`}>{planLabel(plan as any)}</span>
+                <div className="flex items-center justify-between mb-0.5">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${isPaid ? 'bg-indigo-600' : 'bg-amber-500'}`}>
+                      <Crown className="w-3.5 h-3.5 text-white" />
+                    </div>
+                    <span className={`text-[13px] font-bold ${isPaid ? 'text-indigo-800' : 'text-amber-800'}`}>{planLabel(plan as any)}</span>
                   </div>
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isExpired ? 'bg-red-100 text-red-600' : isPaid ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
                     {isExpired ? 'Expired' : 'Active'}
@@ -300,15 +307,15 @@ export function YouTubeScraper() {
                 </div>
                 {!isPaid && !isExpired && (
                   <button onClick={() => navigate('/#pricing')}
-                    className="w-full mt-2.5 text-[11px] font-bold text-white py-1.5 rounded-lg hover:opacity-90 transition-opacity"
-                    style={{ background: 'linear-gradient(135deg,#5B4FE8,#7C6FEF)' }}>Upgrade Plan</button>
+                    className="w-full mt-3 text-[11px] font-bold text-white py-2 rounded-xl hover:opacity-90 transition-opacity"
+                    style={{ background: 'linear-gradient(135deg,#4F46E5,#6D5FE8)' }}>Upgrade Plan</button>
                 )}
               </>
             )}
           </div>
         )}
         <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-          className="flex items-center justify-center h-9 border-t border-gray-100 text-gray-400 hover:text-indigo-600 hover:bg-gray-50 transition-colors shrink-0 select-none text-base">
+          className="flex items-center justify-center h-10 border-t border-gray-100 text-gray-400 hover:text-indigo-600 hover:bg-gray-50 transition-colors shrink-0 select-none text-lg font-light">
           {sidebarCollapsed ? '›' : '‹'}
         </button>
       </aside>
@@ -317,7 +324,7 @@ export function YouTubeScraper() {
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
 
         {/* Topbar */}
-        <header className="h-[64px] bg-white border-b border-gray-200 flex items-center px-8 shrink-0">
+        <header className="h-[72px] bg-white border-b border-gray-200 flex items-center px-8 shrink-0">
           <div className="flex-1 min-w-0">
             <h2 className="text-[15px] font-bold text-gray-900 leading-none">YouTube Scraper</h2>
             <p className="text-[11px] text-gray-400 mt-0.5 leading-none">Extract video data from any YouTube video or playlist</p>
