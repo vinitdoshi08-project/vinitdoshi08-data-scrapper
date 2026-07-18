@@ -8,8 +8,12 @@ import os
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
 # Check multiple env var names for compatibility with local .env and Render
-SENDER_EMAIL = os.environ.get("ADMIN_EMAIL") or os.environ.get("SMTP_USERNAME") or os.environ.get("EMAIL_FROM") or "arjunvinit4@gmail.com"
-APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD") or os.environ.get("SMTP_PASSWORD") or "iakf joyh kbxz kydr"
+raw_sender = os.environ.get("ADMIN_EMAIL") or os.environ.get("SMTP_USERNAME") or os.environ.get("EMAIL_FROM") or "arjunvinit4@gmail.com"
+SENDER_EMAIL = raw_sender.strip()
+raw_pwd = os.environ.get("GMAIL_APP_PASSWORD") or os.environ.get("SMTP_PASSWORD") or "iakf joyh kbxz kydr"
+APP_PASSWORD = raw_pwd.replace(" ", "").strip()
+# Debug log (mask password)
+print(f"[EmailService] Using sender: {SENDER_EMAIL}, password length: {len(APP_PASSWORD)}")
 
 def send_admin_notification(full_name, email, plan, registration_time, ip_address, os_type, country="Unknown"):
     try:
@@ -232,13 +236,18 @@ def send_otp_email(user_email, otp_code):
         msg.attach(MIMEText(text, "plain"))
         msg.attach(MIMEText(html, "html"))
         
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
-            server.starttls()
-            server.login(SENDER_EMAIL, APP_PASSWORD)
-            server.send_message(msg)
-            
-        print("OTP email sent successfully.")
-        return True
+        try:
+            with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+                server.ehlo()
+                server.starttls()
+                server.ehlo()
+                server.login(SENDER_EMAIL, APP_PASSWORD)
+                server.send_message(msg)
+            print("[EmailService] OTP email sent successfully.")
+            return True
+        except Exception as e:
+            print(f"[EmailService] Failed to send OTP email: {e}")
+            return False
     except Exception as e:
         print(f"Failed to send OTP email: {e}")
         return False
