@@ -313,48 +313,69 @@ async def send_otp(req: SendOtpRequest):
     code = f"{random.randint(100000, 999999)}"
     expires = datetime.utcnow() + timedelta(minutes=10)
     
-    conn = sqlite3.connect(DATABASE_URL)
-    c = conn.cursor()
     try:
-        c.execute("INSERT OR REPLACE INTO otp_verifications (email, otp_code, expires_at, verified) VALUES (?, ?, ?, 0)",
-                  (req.email.lower(), code, expires.isoformat()))
-        conn.commit()
-    finally:
-        conn.close()
+        conn = sqlite3.connect(DATABASE_URL)
+        c = conn.cursor()
+        try:
+            c.execute("INSERT OR REPLACE INTO otp_verifications (email, otp_code, expires_at, verified) VALUES (?, ?, ?, 0)",
+                      (req.email.lower(), code, expires.isoformat()))
+            conn.commit()
+        finally:
+            conn.close()
+    except Exception as e:
+        print(f"[send_otp] Database error: {e}")
+        raise HTTPException(status_code=500, detail=f"Database initialization error: {e}")
         
-    threading.Thread(target=send_otp_email, args=(req.email.lower(), code)).start()
+    try:
+        threading.Thread(target=send_otp_email, args=(req.email.lower(), code)).start()
+    except Exception as e:
+        print(f"[send_otp] Threading error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to trigger email thread: {e}")
+        
     return {"status": "success", "message": "OTP sent"}
 
 @app.post("/api/auth/verify-otp")
 async def verify_otp(req: VerifyOtpRequest):
-    conn = sqlite3.connect(DATABASE_URL)
-    c = conn.cursor()
     try:
-        c.execute("SELECT otp_code, expires_at FROM otp_verifications WHERE email=?", (req.email.lower(),))
-        row = c.fetchone()
-        if not row:
-            raise HTTPException(status_code=400, detail="No OTP found for this email. Please click Send Code first.")
-        
-        stored_code, expires_at_str = row
-        expires_at = datetime.fromisoformat(expires_at_str)
-        
-        if datetime.utcnow() > expires_at:
-            raise HTTPException(status_code=400, detail="OTP has expired. Please request a new one.")
+        conn = sqlite3.connect(DATABASE_URL)
+        c = conn.cursor()
+        try:
+            c.execute("SELECT otp_code, expires_at FROM otp_verifications WHERE email=?", (req.email.lower(),))
+            row = c.fetchone()
+            if not row:
+                raise HTTPException(status_code=400, detail="No OTP found for this email. Please click Send Code first.")
             
-        if stored_code != req.otp.strip():
-            raise HTTPException(status_code=400, detail="Invalid OTP code.")
+            stored_code, expires_at_str = row
+            expires_at = datetime.fromisoformat(expires_at_str)
             
-        c.execute("UPDATE otp_verifications SET verified=1 WHERE email=?", (req.email.lower(),))
-        conn.commit()
-        return {"status": "success"}
-    finally:
-        conn.close()
+            if datetime.utcnow() > expires_at:
+                raise HTTPException(status_code=400, detail="OTP has expired. Please request a new one.")
+                
+            if stored_code != req.otp.strip():
+                raise HTTPException(status_code=400, detail="Invalid OTP code.")
+                
+            c.execute("UPDATE otp_verifications SET verified=1 WHERE email=?", (req.email.lower(),))
+            conn.commit()
+            return {"status": "success"}
+        finally:
+            conn.close()
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[verify_otp] Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/auth/signup")
 async def signup(user: UserSignup):
     conn = sqlite3.connect(DATABASE_URL)
     c = conn.cursor()
     try:
+        # Enforce OTP verification check
+        c.execute("SELECT verified FROM otp_verifications WHERE email=?", (user.email.lower(),))
+        row = c.fetchone()
+        if not row or not row[0]:
+            raise HTTPException(status_code=400, detail="Please verify your email address via OTP first.")
+
         c.execute("SELECT id FROM users WHERE email=?", (user.email.lower(),))
         if c.fetchone():
             raise HTTPException(status_code=400, detail="Email already exists")

@@ -154,7 +154,7 @@ export function Signup() {
     if (!formData.fullName.trim())  e.fullName = 'Full name is required';
     if (!formData.email.trim())     e.email    = 'Email is required';
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) e.email = 'Invalid email address';
-    if (formData.password.length < 6)                   e.password = 'At least 6 characters';
+    if (formData.password.length < 8)                   e.password = 'At least 8 characters';
     if (formData.password !== formData.confirmPassword) e.confirmPassword = 'Passwords do not match';
     if (!agreed) e.submit = 'You must agree to the Terms of Service and Privacy Policy.';
     if (!otpVerified) e.submit = 'Please verify your email address before creating an account.';
