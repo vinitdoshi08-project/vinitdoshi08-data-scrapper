@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import FastAPI, HTTPException, Form
+from fastapi import FastAPI, HTTPException, Form, Request
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from googleapiclient.errors import HttpError
@@ -16,6 +16,7 @@ import base64
 import hashlib
 import hmac as _hmac
 import httpx
+import random
 from dotenv import load_dotenv
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -24,6 +25,8 @@ from scraper import (
     extract_id_from_url, fetch_playlist_videos, fetch_video_details,
     save_to_excel, save_to_pdf, save_to_json, DEFAULT_API_KEY,
 )
+import threading
+from email_service import send_admin_notification, send_welcome_email, send_otp_email
 
 # Load backend/.env
 load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
@@ -177,6 +180,12 @@ def init_db():
         quota_exceeded INTEGER DEFAULT 0,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )''')
+    c.execute('''CREATE TABLE IF NOT EXISTS otp_verifications (
+        email TEXT PRIMARY KEY,
+        otp_code TEXT NOT NULL,
+        expires_at TIMESTAMP NOT NULL,
+        verified INTEGER DEFAULT 0
+    )''')
     conn.commit()
     conn.close()
 
@@ -197,6 +206,18 @@ def _ensure_sub_columns(conn: sqlite3.Connection):
             pass  # column already exists
 
 # ── Pydantic models ───────────────────────────────────────────
+class SendOtpRequest(BaseModel):
+    email: EmailStr
+
+class VerifyOtpRequest(BaseModel):
+    email: EmailStr
+    otp: str
+
+class SignupNotification(BaseModel):
+    full_name: str
+    email: EmailStr
+    plan: str
+
 class UserSignup(BaseModel):
     full_name: str
     email: EmailStr
@@ -264,6 +285,68 @@ def decode_token(token: str) -> str:
     raise HTTPException(status_code=401, detail="Invalid or expired token")
 
 # ── Auth endpoints ────────────────────────────────────────────
+# ── Routes ────────────────────────────────────────────────────
+
+@app.post("/api/notify-signup")
+async def notify_signup(data: SignupNotification, request: Request):
+    ip_address = request.client.host if request.client else "Unknown"
+    os_type = request.headers.get("User-Agent", "Unknown")
+    registration_time = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+    
+    threading.Thread(
+        target=send_admin_notification, 
+        args=(data.full_name, data.email, data.plan, registration_time, ip_address, os_type)
+    ).start()
+    
+    threading.Thread(
+        target=send_welcome_email,
+        args=(data.email, data.full_name)
+    ).start()
+    
+    return {"status": "success"}
+
+@app.post("/api/auth/send-otp")
+async def send_otp(req: SendOtpRequest):
+    code = f"{random.randint(100000, 999999)}"
+    expires = datetime.utcnow() + timedelta(minutes=10)
+    
+    conn = sqlite3.connect(DATABASE_URL)
+    c = conn.cursor()
+    try:
+        c.execute("INSERT OR REPLACE INTO otp_verifications (email, otp_code, expires_at, verified) VALUES (?, ?, ?, 0)",
+                  (req.email.lower(), code, expires.isoformat()))
+        conn.commit()
+    finally:
+        conn.close()
+        
+    threading.Thread(target=send_otp_email, args=(req.email.lower(), code)).start()
+    return {"status": "success", "message": "OTP sent"}
+
+@app.post("/api/auth/verify-otp")
+async def verify_otp(req: VerifyOtpRequest):
+    conn = sqlite3.connect(DATABASE_URL)
+    c = conn.cursor()
+    try:
+        c.execute("SELECT otp_code, expires_at FROM otp_verifications WHERE email=?", (req.email.lower(),))
+        row = c.fetchone()
+        if not row:
+            raise HTTPException(status_code=400, detail="No OTP found for this email. Please click Send Code first.")
+        
+        stored_code, expires_at_str = row
+        expires_at = datetime.fromisoformat(expires_at_str)
+        
+        if datetime.utcnow() > expires_at:
+            raise HTTPException(status_code=400, detail="OTP has expired. Please request a new one.")
+            
+        if stored_code != req.otp.strip():
+            raise HTTPException(status_code=400, detail="Invalid OTP code.")
+            
+        c.execute("UPDATE otp_verifications SET verified=1 WHERE email=?", (req.email.lower(),))
+        conn.commit()
+        return {"status": "success"}
+    finally:
+        conn.close()
+
 @app.post("/api/auth/signup")
 async def signup(user: UserSignup):
     conn = sqlite3.connect(DATABASE_URL)

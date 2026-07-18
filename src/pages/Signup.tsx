@@ -84,6 +84,11 @@ export function Signup() {
   const [errors,   setErrors]         = useState<Record<string, string>>({});
   const [statusMsg, setStatusMsg]     = useState('');
   const [agreed, setAgreed]           = useState(false);
+  const [otp, setOtp]                 = useState('');
+  const [otpSent, setOtpSent]         = useState(false);
+  const [otpVerified, setOtpVerified] = useState(false);
+  const [sendingOtp, setSendingOtp]   = useState(false);
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
 
   const [usdToInr, setUsdToInr] = useState<number>(84);
   useEffect(() => {
@@ -97,6 +102,53 @@ export function Signup() {
     return Math.round(usdDollars * usdToInr * 100);
   }
 
+  async function handleSendOtp() {
+    if (!formData.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      setErrors({ ...errors, email: 'Enter a valid email first' });
+      return;
+    }
+    setSendingOtp(true);
+    setErrors({ ...errors, email: '' });
+    try {
+      const res = await fetch(`${API_URL}/api/auth/send-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: formData.email }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(()=>({}));
+        throw new Error(d.detail || 'Failed to send code');
+      }
+      setOtpSent(true);
+    } catch (err: any) {
+      setErrors({ ...errors, email: err.message });
+    } finally {
+      setSendingOtp(false);
+    }
+  }
+
+  async function handleVerifyOtp() {
+    if (!otp.trim()) return;
+    setVerifyingOtp(true);
+    try {
+      const res = await fetch(`${API_URL}/api/auth/verify-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: formData.email, otp }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(()=>({}));
+        throw new Error(d.detail || 'Invalid code');
+      }
+      setOtpVerified(true);
+      setErrors({ ...errors, submit: '' });
+    } catch (err: any) {
+      setErrors({ ...errors, submit: err.message });
+    } finally {
+      setVerifyingOtp(false);
+    }
+  }
+
   function validate() {
     const e: Record<string, string> = {};
     if (!formData.fullName.trim())  e.fullName = 'Full name is required';
@@ -105,6 +157,7 @@ export function Signup() {
     if (formData.password.length < 6)                   e.password = 'At least 6 characters';
     if (formData.password !== formData.confirmPassword) e.confirmPassword = 'Passwords do not match';
     if (!agreed) e.submit = 'You must agree to the Terms of Service and Privacy Policy.';
+    if (!otpVerified) e.submit = 'Please verify your email address before creating an account.';
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -118,6 +171,17 @@ export function Signup() {
     try {
       setStatusMsg('Creating your account…');
       await signup(formData.fullName, formData.email, formData.password);
+
+      // Notify backend about signup for emails
+      fetch(`${API_URL}/api/notify-signup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          full_name: formData.fullName,
+          email: formData.email,
+          plan: planCfg.name,
+        }),
+      }).catch(err => console.error("Notification error:", err));
 
       if (!isPaid) {
         setStep('done');
@@ -273,7 +337,8 @@ export function Signup() {
                       /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email) &&
                       formData.password.length >= 6 &&
                       formData.password === formData.confirmPassword &&
-                      agreed;
+                      agreed &&
+                      otpVerified;
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', fontFamily: FF }}>
@@ -407,8 +472,36 @@ export function Signup() {
                 label="Email address" id="email" type="email" value={formData.email}
                 placeholder="you@company.com" error={errors.email}
                 icon={<Mail style={{ width: 15, height: 15 }} />}
-                onChange={v => { setFormData({ ...formData, email: v }); if (errors.email) setErrors({ ...errors, email: '' }); }}
+                onChange={v => { setFormData({ ...formData, email: v }); if (errors.email) setErrors({ ...errors, email: '' }); setOtpSent(false); setOtpVerified(false); setOtp(''); }}
+                rightEl={
+                  otpVerified ? (
+                    <span style={{ color: '#059669', fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, marginRight: 10 }}>
+                      ✓ Verified
+                    </span>
+                  ) : (
+                    <button type="button" onClick={handleSendOtp} disabled={sendingOtp || !formData.email} style={{ background: 'transparent', border: 'none', color: '#5B4FE8', fontSize: 13, fontWeight: 600, cursor: (sendingOtp || !formData.email) ? 'not-allowed' : 'pointer', opacity: (sendingOtp || !formData.email) ? 0.5 : 1, padding: '0 10px' }}>
+                      {sendingOtp ? 'Sending...' : (otpSent ? 'Resend' : 'Send Code')}
+                    </button>
+                  )
+                }
               />
+
+              {/* OTP Input */}
+              {otpSent && !otpVerified && (
+                <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', marginTop: -4 }}>
+                  <div style={{ flex: 1 }}>
+                    <InputField
+                      label="Verification Code" id="otp" type="text" value={otp}
+                      placeholder="6-digit code" error=""
+                      icon={<Lock style={{ width: 15, height: 15 }} />}
+                      onChange={v => setOtp(v)}
+                    />
+                  </div>
+                  <button type="button" onClick={handleVerifyOtp} disabled={verifyingOtp || otp.length < 5} style={{ height: 42, padding: '0 20px', background: '#5B4FE8', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, cursor: (verifyingOtp || otp.length < 5) ? 'not-allowed' : 'pointer', opacity: (verifyingOtp || otp.length < 5) ? 0.7 : 1 }}>
+                    {verifyingOtp ? 'Verifying...' : 'Verify'}
+                  </button>
+                </div>
+              )}
 
               {/* Password */}
               <InputField
