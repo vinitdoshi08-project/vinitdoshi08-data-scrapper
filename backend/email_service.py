@@ -7,9 +7,9 @@ import os
 
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
-# Fallbacks use the credentials provided directly by the user
-SENDER_EMAIL = os.environ.get("ADMIN_EMAIL", "arjunvinit4@gmail.com")
-APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD", "iakf joyh kbxz kydr")
+# Check multiple env var names for compatibility with local .env and Render
+SENDER_EMAIL = os.environ.get("ADMIN_EMAIL") or os.environ.get("SMTP_USERNAME") or os.environ.get("EMAIL_FROM") or "arjunvinit4@gmail.com"
+APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD") or os.environ.get("SMTP_PASSWORD") or "iakf joyh kbxz kydr"
 
 def send_admin_notification(full_name, email, plan, registration_time, ip_address, os_type, country="Unknown"):
     try:

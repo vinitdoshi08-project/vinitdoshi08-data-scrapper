@@ -39,7 +39,10 @@ _extra_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
 _allow_origins = list(set([
     "http://localhost:5173",
     "http://localhost:4173",
+    "http://localhost:8000",
+    "https://scrapify-01.netlify.app",
 ] + _extra_origins))
+print(f"CORS allowed origins: {_allow_origins}")
 
 app.add_middleware(
     CORSMiddleware,
