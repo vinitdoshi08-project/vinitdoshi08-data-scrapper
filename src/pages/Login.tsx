@@ -107,12 +107,12 @@ export function Login() {
                       fontSize: 14, color: '#111827',
                       border: `1.5px solid ${errors.email ? '#fca5a5' : '#e5e7eb'}`,
                       borderRadius: 10, outline: 'none',
-                      background: errors.email ? '#fff8f8' : '#f9fafb',
+                      background: errors.email ? '#fff8f8' : '#fff',
                       transition: 'border-color .18s, box-shadow .18s',
                       fontFamily: FF,
                     }}
                     onFocus={e => { e.currentTarget.style.borderColor = '#5B4FE8'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(91,79,232,.1)'; e.currentTarget.style.background = '#fff'; }}
-                    onBlur={e => { e.currentTarget.style.borderColor = errors.email ? '#fca5a5' : '#e5e7eb'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.background = errors.email ? '#fff8f8' : '#f9fafb'; }}
+                    onBlur={e => { e.currentTarget.style.borderColor = errors.email ? '#fca5a5' : '#e5e7eb'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.background = errors.email ? '#fff8f8' : '#fff'; }}
                   />
                 </div>
                 {errors.email && <p style={{ marginTop: 4, fontSize: 12, color: '#ef4444' }}>{errors.email}</p>}
@@ -139,12 +139,12 @@ export function Login() {
                       fontSize: 14, color: '#111827',
                       border: `1.5px solid ${errors.password ? '#fca5a5' : '#e5e7eb'}`,
                       borderRadius: 10, outline: 'none',
-                      background: errors.password ? '#fff8f8' : '#f9fafb',
+                      background: errors.password ? '#fff8f8' : '#fff',
                       transition: 'border-color .18s, box-shadow .18s',
                       fontFamily: FF,
                     }}
                     onFocus={e => { e.currentTarget.style.borderColor = '#5B4FE8'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(91,79,232,.1)'; e.currentTarget.style.background = '#fff'; }}
-                    onBlur={e => { e.currentTarget.style.borderColor = errors.password ? '#fca5a5' : '#e5e7eb'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.background = errors.password ? '#fff8f8' : '#f9fafb'; }}
+                    onBlur={e => { e.currentTarget.style.borderColor = errors.password ? '#fca5a5' : '#e5e7eb'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.background = errors.password ? '#fff8f8' : '#fff'; }}
                   />
                   <button type="button" onClick={() => setShowPassword(!showPassword)}
                     style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 0, display: 'flex', alignItems: 'center' }}>

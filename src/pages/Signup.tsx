@@ -29,6 +29,44 @@ function loadRazorpayScript(): Promise<void> {
 
 const FF = 'ui-sans-serif,system-ui,-apple-system,sans-serif';
 
+// ── Input helper ──
+function InputField({
+  label, id, type = 'text', value, placeholder, error, icon, rightEl, onChange,
+}: {
+  label: string; id: string; type?: string; value: string; placeholder: string;
+  error?: string; icon: React.ReactNode; rightEl?: React.ReactNode;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div>
+      <label htmlFor={id} style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 6 }}>{label}</label>
+      <div style={{ position: 'relative' }}>
+        <span style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: error ? '#ef4444' : '#9ca3af', display: 'flex' }}>
+          {icon}
+        </span>
+        <input id={id} type={type} value={value} placeholder={placeholder}
+          onChange={e => onChange(e.target.value)}
+          style={{
+            width: '100%', boxSizing: 'border-box',
+            padding: `11px ${rightEl ? '40px' : '14px'} 11px 38px`,
+            fontSize: 14, color: '#111827', fontFamily: FF,
+            border: `1.5px solid ${error ? '#fca5a5' : '#e5e7eb'}`,
+            borderRadius: 10, outline: 'none',
+            background: error ? '#fff8f8' : '#fff',
+            transition: 'border-color .18s, box-shadow .18s',
+          }}
+          onFocus={e => { e.currentTarget.style.borderColor = '#5B4FE8'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(91,79,232,.1)'; e.currentTarget.style.background = '#fff'; }}
+          onBlur={e => { e.currentTarget.style.borderColor = error ? '#fca5a5' : '#e5e7eb'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.background = error ? '#fff8f8' : '#fff'; }}
+        />
+        {rightEl && (
+          <span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)' }}>{rightEl}</span>
+        )}
+      </div>
+      {error && <p style={{ marginTop: 4, fontSize: 12, color: '#ef4444' }}>{error}</p>}
+    </div>
+  );
+}
+
 export function Signup() {
   const navigate     = useNavigate();
   const [params]     = useSearchParams();
@@ -66,6 +104,7 @@ export function Signup() {
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) e.email = 'Invalid email address';
     if (formData.password.length < 6)                   e.password = 'At least 6 characters';
     if (formData.password !== formData.confirmPassword) e.confirmPassword = 'Passwords do not match';
+    if (!agreed) e.submit = 'You must agree to the Terms of Service and Privacy Policy.';
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -226,45 +265,15 @@ export function Signup() {
     );
   }
 
-  // ── Input helper ──
-  function InputField({
-    label, id, type = 'text', value, placeholder, error, icon, rightEl, onChange,
-  }: {
-    label: string; id: string; type?: string; value: string; placeholder: string;
-    error?: string; icon: React.ReactNode; rightEl?: React.ReactNode;
-    onChange: (v: string) => void;
-  }) {
-    return (
-      <div>
-        <label htmlFor={id} style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 6 }}>{label}</label>
-        <div style={{ position: 'relative' }}>
-          <span style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: error ? '#ef4444' : '#9ca3af', display: 'flex' }}>
-            {icon}
-          </span>
-          <input id={id} type={type} value={value} placeholder={placeholder}
-            onChange={e => onChange(e.target.value)}
-            style={{
-              width: '100%', boxSizing: 'border-box',
-              padding: `11px ${rightEl ? '40px' : '14px'} 11px 38px`,
-              fontSize: 14, color: '#111827', fontFamily: FF,
-              border: `1.5px solid ${error ? '#fca5a5' : '#e5e7eb'}`,
-              borderRadius: 10, outline: 'none',
-              background: error ? '#fff8f8' : '#f9fafb',
-              transition: 'border-color .18s, box-shadow .18s',
-            }}
-            onFocus={e => { e.currentTarget.style.borderColor = '#5B4FE8'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(91,79,232,.1)'; e.currentTarget.style.background = '#fff'; }}
-            onBlur={e => { e.currentTarget.style.borderColor = error ? '#fca5a5' : '#e5e7eb'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.background = error ? '#fff8f8' : '#f9fafb'; }}
-          />
-          {rightEl && (
-            <span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)' }}>{rightEl}</span>
-          )}
-        </div>
-        {error && <p style={{ marginTop: 4, fontSize: 12, color: '#ef4444' }}>{error}</p>}
-      </div>
-    );
-  }
+
 
   const inrApprox = Math.round(planCfg.usdPrice * usdToInr);
+
+  const isFormValid = formData.fullName.trim() !== '' &&
+                      /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email) &&
+                      formData.password.length >= 6 &&
+                      formData.password === formData.confirmPassword &&
+                      agreed;
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', fontFamily: FF }}>
@@ -454,8 +463,8 @@ export function Signup() {
                   boxShadow: '0 4px 16px rgba(91,79,232,.35)',
                   marginTop: 4,
                 }}
-                onMouseOver={e => { if (!loading) { e.currentTarget.style.opacity = '0.92'; e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 6px 22px rgba(91,79,232,.45)'; } }}
-                onMouseOut={e => { e.currentTarget.style.opacity = loading ? '0.65' : '1'; e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(91,79,232,.35)'; }}
+                onMouseOver={e => { if (!loading && step !== 'processing') { e.currentTarget.style.opacity = '0.92'; e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 6px 22px rgba(91,79,232,.45)'; } }}
+                onMouseOut={e => { e.currentTarget.style.opacity = (loading || step === 'processing') ? '0.65' : '1'; e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(91,79,232,.35)'; }}
               >
                 {loading
                   ? <><Loader2 style={{ width: 16, height: 16, animation: 'spin .7s linear infinite' }} /> {statusMsg || 'Please wait…'}</>
