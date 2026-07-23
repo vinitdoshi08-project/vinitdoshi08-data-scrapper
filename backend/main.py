@@ -25,11 +25,14 @@ from scraper import (
     extract_id_from_url, fetch_playlist_videos, fetch_video_details,
     save_to_excel, save_to_pdf, save_to_json, DEFAULT_API_KEY,
 )
+from dotenv import load_dotenv
+import os
+
+# Load backend/.env first so imported modules get the vars
+load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
+
 import threading
 from email_service import send_admin_notification, send_welcome_email, send_otp_email
-
-# Load backend/.env
-load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
 
 app = FastAPI()
 
@@ -41,6 +44,7 @@ _allow_origins = list(set([
     "http://localhost:4173",
     "http://localhost:8000",
     "https://scrapify-01.netlify.app",
+    "https://scrapify-02.netlify.app",
 ] + _extra_origins))
 print(f"CORS allowed origins: {_allow_origins}")
 
