@@ -275,10 +275,17 @@ async def send_otp(req: SendOtpRequest):
         raise HTTPException(status_code=500, detail=str(e))
         
     try:
-        threading.Thread(target=send_otp_email, args=(req.email.lower(), code)).start()
+        email_success = send_otp_email(req.email.lower(), code)
+        if not email_success:
+            print(f"[send_otp] Email sending failed for {req.email.lower()}", flush=True)
+            # You might want to delete the Supabase row here if email fails, 
+            # but for now we just return an error so the frontend knows it failed.
+            raise HTTPException(status_code=500, detail="Failed to send OTP email. Please check server email credentials.")
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"[send_otp] Threading error: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to trigger email thread: {e}")
+        print(f"[send_otp] Email error: {e}", flush=True)
+        raise HTTPException(status_code=500, detail=f"Failed to trigger email: {e}")
         
     return {"status": "success", "message": "OTP sent"}
 

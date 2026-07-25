@@ -243,10 +243,10 @@ def send_otp_email(user_email, otp_code):
                 server.ehlo()
                 server.login(SENDER_EMAIL, APP_PASSWORD)
                 server.send_message(msg)
-            print("[EmailService] OTP email sent successfully.")
+            print("[EmailService] OTP email sent successfully.", flush=True)
             return True
         except Exception as e:
-            print(f"[EmailService] Failed to send OTP email: {e}")
+            print(f"[EmailService] Failed to send OTP email: {e}", flush=True)
             return False
     except Exception as e:
         print(f"Failed to send OTP email: {e}")
