@@ -8,8 +8,6 @@ from cryptography.fernet import Fernet
 import os
 import re
 import tempfile
-import sqlite3
-import bcrypt
 import jwt
 import uuid
 import base64
@@ -59,7 +57,6 @@ app.add_middleware(
 
 # ── Config ────────────────────────────────────────────────────
 BASE_DIR     = os.path.dirname(os.path.abspath(__file__))
-DATABASE_URL = os.path.join(BASE_DIR, "users.db")
 SECRET_KEY   = os.environ.get("SECRET_KEY", "your_secret_key_change_this_for_production")
 ALGORITHM    = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 1 day
@@ -170,47 +167,7 @@ def mask_api_key(key: str) -> str:
         return key[:4] + "••••"
     return key[:8] + "••••••••••••" + key[-3:]
 
-# ── DB init ───────────────────────────────────────────────────
-def init_db():
-    conn = sqlite3.connect(DATABASE_URL)
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS users (
-        id TEXT PRIMARY KEY,
-        full_name TEXT NOT NULL,
-        email TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )''')
-    c.execute('''CREATE TABLE IF NOT EXISTS user_api_keys (
-        user_id TEXT PRIMARY KEY,
-        encrypted_key TEXT NOT NULL,
-        quota_exceeded INTEGER DEFAULT 0,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )''')
-    c.execute('''CREATE TABLE IF NOT EXISTS otp_verifications (
-        email TEXT PRIMARY KEY,
-        otp_code TEXT NOT NULL,
-        expires_at TIMESTAMP NOT NULL,
-        verified INTEGER DEFAULT 0
-    )''')
-    conn.commit()
-    conn.close()
-
-init_db()
-print(f"DB: {DATABASE_URL}")
-
-# ── Helpers: ensure subscription columns exist ────────────────
-def _ensure_sub_columns(conn: sqlite3.Connection):
-    for col, typ in [
-        ("plan",                "TEXT DEFAULT 'free'"),
-        ("trial_ends_at",       "TEXT"),
-        ("razorpay_payment_id", "TEXT"),
-    ]:
-        try:
-            conn.execute(f"ALTER TABLE users ADD COLUMN {col} {typ}")
-            conn.commit()
-        except Exception:
-            pass  # column already exists
+# SQLite DB init removed
 
 # ── Pydantic models ───────────────────────────────────────────
 class SendOtpRequest(BaseModel):
@@ -225,23 +182,7 @@ class SignupNotification(BaseModel):
     email: EmailStr
     plan: str
 
-class UserSignup(BaseModel):
-    full_name: str
-    email: EmailStr
-    password: str
-
-class UserLogin(BaseModel):
-    email: EmailStr
-    password: str
-
-class UserUpdate(BaseModel):
-    full_name: str
-    email: EmailStr
-    token: str
-
-class ApiKeyPayload(BaseModel):
-    token: str
-    api_key: str
+# Removed unused Pydantic models
 
 class CreateOrderRequest(BaseModel):
     amount: int          # smallest currency unit (INR paise OR USD cents)
@@ -263,15 +204,7 @@ class SaveSubscriptionRequest(BaseModel):
     currency:            str = "USD"
 
 # ── Auth helpers ──────────────────────────────────────────────
-def hash_password(pw: str) -> str:
-    return bcrypt.hashpw(pw.encode(), bcrypt.gensalt()).decode()
-
-def verify_password(plain: str, hashed: str) -> bool:
-    return bcrypt.checkpw(plain.encode(), hashed.encode())
-
-def create_access_token(data: dict) -> str:
-    payload = {**data, "exp": datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)}
-    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+# Removed unused Auth helpers
 
 def decode_token(token: str) -> str:
     """Returns user_id from either our own JWT or a Supabase JWT."""
@@ -317,18 +250,29 @@ async def send_otp(req: SendOtpRequest):
     code = f"{random.randint(100000, 999999)}"
     expires = datetime.utcnow() + timedelta(minutes=10)
     
+    if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
+        raise HTTPException(status_code=500, detail="Supabase not configured.")
+        
     try:
-        conn = sqlite3.connect(DATABASE_URL)
-        c = conn.cursor()
-        try:
-            c.execute("INSERT OR REPLACE INTO otp_verifications (email, otp_code, expires_at, verified) VALUES (?, ?, ?, 0)",
-                      (req.email.lower(), code, expires.isoformat()))
-            conn.commit()
-        finally:
-            conn.close()
+        async with httpx.AsyncClient(timeout=8) as client:
+            r = await client.post(
+                f"{SUPABASE_URL}/rest/v1/otp_verifications",
+                headers=_sb_headers("resolution=merge-duplicates,return=representation"),
+                json={
+                    "email": req.email.lower(),
+                    "otp_code": code,
+                    "expires_at": expires.isoformat(),
+                    "verified": False
+                }
+            )
+            if r.status_code not in (200, 201, 204):
+                print(f"[send_otp] Supabase error: {r.text}")
+                raise HTTPException(status_code=500, detail="Database insertion error.")
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"[send_otp] Database error: {e}")
-        raise HTTPException(status_code=500, detail=f"Database initialization error: {e}")
+        print(f"[send_otp] DB error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
         
     try:
         threading.Thread(target=send_otp_email, args=(req.email.lower(), code)).start()
@@ -340,17 +284,26 @@ async def send_otp(req: SendOtpRequest):
 
 @app.post("/api/auth/verify-otp")
 async def verify_otp(req: VerifyOtpRequest):
+    if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
+        raise HTTPException(status_code=500, detail="Supabase not configured.")
+        
     try:
-        conn = sqlite3.connect(DATABASE_URL)
-        c = conn.cursor()
-        try:
-            c.execute("SELECT otp_code, expires_at FROM otp_verifications WHERE email=?", (req.email.lower(),))
-            row = c.fetchone()
-            if not row:
+        async with httpx.AsyncClient(timeout=8) as client:
+            r = await client.get(
+                f"{SUPABASE_URL}/rest/v1/otp_verifications",
+                headers=_sb_headers(),
+                params={"email": f"eq.{req.email.lower()}"},
+            )
+            if r.status_code != 200:
+                raise HTTPException(status_code=500, detail="Database query error.")
+            rows = r.json()
+            if not rows:
                 raise HTTPException(status_code=400, detail="No OTP found for this email. Please click Send Code first.")
             
-            stored_code, expires_at_str = row
-            expires_at = datetime.fromisoformat(expires_at_str)
+            row = rows[0]
+            stored_code = row["otp_code"]
+            expires_at_str = row["expires_at"]
+            expires_at = datetime.fromisoformat(expires_at_str.replace("Z", ""))
             
             if datetime.utcnow() > expires_at:
                 raise HTTPException(status_code=400, detail="OTP has expired. Please request a new one.")
@@ -358,146 +311,23 @@ async def verify_otp(req: VerifyOtpRequest):
             if stored_code != req.otp.strip():
                 raise HTTPException(status_code=400, detail="Invalid OTP code.")
                 
-            c.execute("UPDATE otp_verifications SET verified=1 WHERE email=?", (req.email.lower(),))
-            conn.commit()
+            upd = await client.patch(
+                f"{SUPABASE_URL}/rest/v1/otp_verifications",
+                headers=_sb_headers(),
+                params={"email": f"eq.{req.email.lower()}"},
+                json={"verified": True}
+            )
+            if upd.status_code not in (200, 204):
+                raise HTTPException(status_code=500, detail="Database update error.")
+            
             return {"status": "success"}
-        finally:
-            conn.close()
     except HTTPException:
         raise
     except Exception as e:
         print(f"[verify_otp] Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/auth/signup")
-async def signup(user: UserSignup):
-    conn = sqlite3.connect(DATABASE_URL)
-    c = conn.cursor()
-    try:
-        # Enforce OTP verification check
-        c.execute("SELECT verified FROM otp_verifications WHERE email=?", (user.email.lower(),))
-        row = c.fetchone()
-        if not row or not row[0]:
-            raise HTTPException(status_code=400, detail="Please verify your email address via OTP first.")
-
-        c.execute("SELECT id FROM users WHERE email=?", (user.email.lower(),))
-        if c.fetchone():
-            raise HTTPException(status_code=400, detail="Email already exists")
-        uid = str(uuid.uuid4())
-        c.execute(
-            "INSERT INTO users VALUES (?,?,?,?,?)",
-            (uid, user.full_name, user.email.lower(), hash_password(user.password), datetime.utcnow().isoformat()),
-        )
-        conn.commit()
-        token = create_access_token({"sub": uid, "email": user.email})
-        return {
-            "token": token,
-            "user": {
-                "id": uid, "full_name": user.full_name,
-                "email": user.email, "created_at": datetime.utcnow().isoformat(),
-            },
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        conn.close()
-
-@app.post("/api/auth/login")
-async def login(credentials: UserLogin):
-    conn = sqlite3.connect(DATABASE_URL)
-    conn.row_factory = sqlite3.Row
-    c = conn.cursor()
-    try:
-        c.execute("SELECT * FROM users WHERE email=?", (credentials.email.lower(),))
-        user = c.fetchone()
-        if not user or not verify_password(credentials.password, user["password"]):
-            raise HTTPException(status_code=401, detail="Invalid email or password")
-        token = create_access_token({"sub": user["id"], "email": user["email"]})
-        return {
-            "token": token,
-            "user": {
-                "id": user["id"], "full_name": user["full_name"],
-                "email": user["email"], "created_at": user["created_at"],
-            },
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        conn.close()
-
-@app.get("/api/auth/me")
-async def get_me(token: str):
-    uid = decode_token(token)
-    conn = sqlite3.connect(DATABASE_URL)
-    conn.row_factory = sqlite3.Row
-    c = conn.cursor()
-    c.execute("SELECT id, full_name, email, created_at FROM users WHERE id=?", (uid,))
-    user = c.fetchone()
-    conn.close()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    return dict(user)
-
-@app.put("/api/auth/profile")
-async def update_profile(data: UserUpdate):
-    uid = decode_token(data.token)
-    conn = sqlite3.connect(DATABASE_URL)
-    c = conn.cursor()
-    try:
-        c.execute("SELECT id FROM users WHERE email=? AND id!=?", (data.email.lower(), uid))
-        if c.fetchone():
-            raise HTTPException(status_code=400, detail="Email already exists")
-        c.execute(
-            "UPDATE users SET full_name=?, email=? WHERE id=?",
-            (data.full_name, data.email.lower(), uid),
-        )
-        conn.commit()
-        return {"message": "Profile updated"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        conn.close()
-
-# ── API Key endpoints ─────────────────────────────────────────
-@app.post("/api/apikey/save")
-async def save_api_key(payload: ApiKeyPayload):
-    uid = decode_token(payload.token)
-    if not payload.api_key or len(payload.api_key.strip()) < 10:
-        raise HTTPException(status_code=400, detail="Invalid API key")
-    enc = encrypt_api_key(payload.api_key.strip())
-    conn = sqlite3.connect(DATABASE_URL)
-    conn.execute(
-        '''INSERT INTO user_api_keys (user_id, encrypted_key, quota_exceeded, updated_at)
-           VALUES (?,?,0,?)
-           ON CONFLICT(user_id) DO UPDATE SET
-               encrypted_key=excluded.encrypted_key,
-               quota_exceeded=0,
-               updated_at=excluded.updated_at''',
-        (uid, enc, datetime.utcnow().isoformat()),
-    )
-    conn.commit()
-    conn.close()
-    return {"message": "API key saved", "masked_key": mask_api_key(payload.api_key.strip())}
-
-@app.get("/api/apikey/status")
-async def get_api_key_status(token: str):
-    uid = decode_token(token)
-    conn = sqlite3.connect(DATABASE_URL)
-    conn.row_factory = sqlite3.Row
-    c = conn.cursor()
-    c.execute("SELECT encrypted_key, quota_exceeded FROM user_api_keys WHERE user_id=?", (uid,))
-    row = c.fetchone()
-    conn.close()
-    if not row:
-        return {"has_key": False, "masked_key": None, "quota_exceeded": False}
-    raw = decrypt_api_key(row["encrypted_key"])
-    return {"has_key": True, "masked_key": mask_api_key(raw), "quota_exceeded": bool(row["quota_exceeded"])}
+# Unused Auth & API Key endpoints removed
 
 # ── Scrape endpoint ───────────────────────────────────────────
 def validate_file_name(name: str) -> bool:
@@ -527,19 +357,8 @@ async def scrape_youtube(
 
     resolved_key = api_key.strip() if api_key and api_key.strip() else DEFAULT_API_KEY
     uid = None
-    if not resolved_key and token:
-        try:
-            uid = decode_token(token)
-            conn = sqlite3.connect(DATABASE_URL)
-            conn.row_factory = sqlite3.Row
-            c = conn.cursor()
-            c.execute("SELECT encrypted_key FROM user_api_keys WHERE user_id=?", (uid,))
-            row = c.fetchone()
-            conn.close()
-            if row:
-                resolved_key = decrypt_api_key(row["encrypted_key"])
-        except Exception:
-            pass
+    # API key fetching from database is removed.
+    # Frontend must provide the API key.
 
     if not resolved_key:
         raise HTTPException(
@@ -586,14 +405,7 @@ async def scrape_youtube(
         raise
     except HttpError as e:
         if _is_quota_error(e):
-            if uid:
-                try:
-                    conn2 = sqlite3.connect(DATABASE_URL)
-                    conn2.execute("UPDATE user_api_keys SET quota_exceeded=1 WHERE user_id=?", (uid,))
-                    conn2.commit()
-                    conn2.close()
-                except Exception:
-                    pass
+            # user_api_keys quota update removed
             raise HTTPException(
                 status_code=429,
                 detail="quota_exceeded: Your YouTube API key has reached its daily limit. Please enter a new API key.",
@@ -768,19 +580,7 @@ async def save_subscription(body: SaveSubscriptionRequest):
         "created_at":     now_iso,
     })
 
-    # ── 4. SQLite fallback ─────────────────────────────────────
-    if not sb_ok:
-        try:
-            conn = sqlite3.connect(DATABASE_URL)
-            _ensure_sub_columns(conn)
-            conn.execute(
-                "UPDATE users SET plan=?, razorpay_payment_id=? WHERE id=?",
-                (body.plan, body.razorpay_payment_id, uid),
-            )
-            conn.commit()
-            conn.close()
-        except Exception as ex:
-            print(f"[save-subscription] SQLite fallback error: {ex}")
+    # ── 4. SQLite fallback removed ──────────────────────────────
 
     # ── 5. Return the updated subscription state ───────────────
     return {
@@ -893,35 +693,10 @@ async def get_subscription(token: str):
                     await sb_update_profile(uid, {"trial_ends_at": trial_ends_at})
 
     # ══════════════════════════════════════════════════════════
-    # STEP 3: If Supabase not configured, fall back to SQLite
+    # STEP 3: If Supabase not configured (SQLite fallback removed)
     # ══════════════════════════════════════════════════════════
     if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
-        conn = sqlite3.connect(DATABASE_URL)
-        _ensure_sub_columns(conn)
-        conn.row_factory = sqlite3.Row
-        c = conn.cursor()
-        c.execute("SELECT plan, trial_ends_at, created_at FROM users WHERE id=?", (uid,))
-        row = c.fetchone()
-        conn.close()
-        if not row:
-            trial_end = (datetime.utcnow() + timedelta(days=3)).isoformat()
-            return {
-                "plan":          "free",
-                "trial_ends_at": trial_end,
-                "trial_active":  True,
-                "can_scrape":    True,
-                "expires_at":    None,
-            }
-        plan          = row["plan"] or "free"
-        trial_ends_at = row["trial_ends_at"]
-        if not trial_ends_at and row["created_at"]:
-            created = _parse_iso(str(row["created_at"]))
-            if created:
-                trial_ends_at = (created.replace(tzinfo=None) + timedelta(days=3)).isoformat()
-                c2 = sqlite3.connect(DATABASE_URL)
-                c2.execute("UPDATE users SET trial_ends_at=? WHERE id=?", (trial_ends_at, uid))
-                c2.commit()
-                c2.close()
+        pass
 
     # ══════════════════════════════════════════════════════════
     # STEP 4: Compute access rights
