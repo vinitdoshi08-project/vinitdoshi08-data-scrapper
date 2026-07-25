@@ -303,7 +303,7 @@ async def verify_otp(req: VerifyOtpRequest):
             row = rows[0]
             stored_code = row["otp_code"]
             expires_at_str = row["expires_at"]
-            expires_at = datetime.fromisoformat(expires_at_str.replace("Z", ""))
+            expires_at = datetime.fromisoformat(expires_at_str.replace("Z", "").split("+")[0])
             
             if datetime.utcnow() > expires_at:
                 raise HTTPException(status_code=400, detail="OTP has expired. Please request a new one.")
