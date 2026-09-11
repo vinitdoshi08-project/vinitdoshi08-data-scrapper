@@ -281,12 +281,6 @@ export function Signup() {
 
   const inrApprox = Math.round(planCfg.usdPrice * usdToInr);
 
-  const isFormValid = formData.fullName.trim() !== '' &&
-                      /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email) &&
-                      formData.password.length >= 6 &&
-                      formData.password === formData.confirmPassword &&
-                      agreed;
-
   return (
     <div style={{ minHeight: '100vh', display: 'flex', fontFamily: FF }}>
       <style>{`@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}`}</style>

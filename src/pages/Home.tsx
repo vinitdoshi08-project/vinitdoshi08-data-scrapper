@@ -1,10 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowRight, Youtube, Globe, Map, Shield, Zap, Download, Bot, CheckCircle2, ChevronDown, ChevronUp, Check, Loader2, X, CreditCard, User, Lock } from 'lucide-react';
+import { ArrowRight, Youtube, Globe, Map, Shield, Zap, Download, Bot, CheckCircle2, ChevronDown, ChevronUp, Check, Loader2, X, CreditCard, Lock } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
-const API_URL   = import.meta.env.VITE_API_URL as string;
-const RZP_KEY_ID = import.meta.env.VITE_RAZORPAY_KEY_ID as string;
+const API_URL = import.meta.env.VITE_API_URL as string;
 
 const faqs = [
   { q: 'What types of data can I scrape?', a: 'YouTube videos and playlists, any public website, and map services. Each scraper is tuned to its source.' },
@@ -45,9 +44,7 @@ function PostPaymentModal({
     e.preventDefault();
     setErr(''); setLoading(true);
     try {
-      let userId: string;
-      let token: string;
-
+      let token = '';
       if (mode === 'signup') {
         const { data, error } = await supabase.auth.signUp({
           email, password,
@@ -55,14 +52,12 @@ function PostPaymentModal({
         });
         if (error) throw error;
         if (!data.user) throw new Error('Signup failed — please try logging in instead.');
-        userId = data.user.id;
         // Get fresh session token
         const { data: { session } } = await supabase.auth.getSession();
         token = session?.access_token ?? '';
       } else {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        userId = data.user.id;
         token  = data.session?.access_token ?? '';
       }
 
@@ -178,7 +173,6 @@ export function Home() {
   const navigate = useNavigate();
   const [openFaq, setOpenFaq]       = useState<number | null>(0);
   const [yearly, setYearly]         = useState(false);
-  const [payingPlan, setPayingPlan] = useState<string | null>(null);
   const [toast, setToast]           = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [postPayment, setPostPayment] = useState<{
     planId: string; planName: string; paymentId: string; orderId: string; amountInr: number;
@@ -200,11 +194,6 @@ export function Home() {
       .finally(() => setRateLoaded(true));
   }, []);
 
-  /** Convert USD dollars to INR paise for Razorpay */
-  function usdToPaise(usd: number): number {
-    return Math.round(usd * usdToInr * 100); // 1 USD = usdToInr rupees = usdToInr*100 paise
-  }
-
   /** Display string e.g. "$6" with INR equivalent underneath */
   function inrEquiv(usd: number): string {
     const inr = Math.round(usd * usdToInr);
@@ -213,18 +202,7 @@ export function Home() {
 
   const dismissToast = () => setToast(null);
 
-  function loadRazorpayScript(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      if (typeof (window as any).Razorpay !== 'undefined') { resolve(); return; }
-      const s = document.createElement('script');
-      s.src     = 'https://checkout.razorpay.com/v1/checkout.js';
-      s.onload  = () => resolve();
-      s.onerror = () => reject(new Error('Failed to load Razorpay. Check your internet connection.'));
-      document.body.appendChild(s);
-    });
-  }
-
-  async function handlePay(planId: 'basic' | 'standard', planName: string, usdAmount: number) {
+  async function handlePay(planId: 'basic' | 'standard') {
     // Determine plan key based on planId + yearly toggle
     const planKey = planId === 'basic'
       ? (yearly ? 'basic_y' : 'basic_m')
@@ -311,6 +289,7 @@ export function Home() {
           background: linear-gradient(135deg, #4F46E5 0%, #7C6FEF 100%);
           color: white !important;
           border: 1px solid transparent;
+          border-radius: 8px !important;
           box-shadow: 0 4px 14px rgba(79, 70, 229, 0.2);
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
         }
@@ -327,6 +306,7 @@ export function Home() {
           background: white !important;
           color: #4F46E5 !important;
           border: 1px solid #D1D5DB;
+          border-radius: 8px !important;
           box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
         }
@@ -384,6 +364,13 @@ export function Home() {
           box-shadow: 0 12px 30px rgba(79, 70, 229, 0.08) !important;
           border-color: rgba(79, 70, 229, 0.15) !important;
         }
+
+        .bg-grid {
+          background-image:
+            linear-gradient(to right, rgba(15, 23, 42, 0.04) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(15, 23, 42, 0.04) 1px, transparent 1px);
+          background-size: 48px 48px;
+        }
       `}</style>
 
       {/* ── TOAST ── */}
@@ -414,7 +401,7 @@ export function Home() {
         <div className="max-w-6xl mx-auto px-6 flex items-center justify-between h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center">
-            <img src="/scrapify.png" alt="Scrapify" className="h-20 w-auto object-contain" />
+            <img src="/scrapify_logo.png" alt="Scrapify" className="h-8 md:h-9 w-auto object-contain" />
           </Link>
 
           {/* Center links */}
@@ -433,7 +420,7 @@ export function Home() {
             </Link>
             <Link
               to="/signup"
-              className="text-sm font-semibold px-4 py-1.5 rounded-md btn-premium"
+              className="text-sm font-semibold px-4 py-1.5 rounded-lg btn-premium"
             >
               Get started
             </Link>
@@ -886,7 +873,7 @@ export function Home() {
                 <p className="text-xs text-transparent select-none mb-4">Spacer</p>
               </div>
               <button
-                className="w-full text-center py-2.5 rounded-xl text-sm font-semibold btn-outline-premium mb-8"
+                className="w-full text-center py-2.5 rounded-lg text-sm font-semibold btn-outline-premium mb-8"
               >
                 Get started free
               </button>
@@ -901,7 +888,7 @@ export function Home() {
 
             {/* ── BASIC — RECOMMENDED ── */}
             <div
-              onClick={() => handlePay('basic', 'Basic', yearly ? 5 : 6)}
+              onClick={() => handlePay('basic')}
               className="rounded-2xl border border-gray-200 p-8 relative h-full flex flex-col cursor-pointer hover:border-indigo-500 hover:shadow-lg transition-all"
               style={{ background: 'linear-gradient(180deg,#fff 0%,#f8f7ff 100%)', boxShadow: '0 8px 32px -4px rgba(91,79,232,0.18)' }}
             >
@@ -926,10 +913,9 @@ export function Home() {
               </div>
 
               <button
-                disabled={!!payingPlan}
-                className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-bold btn-premium mb-8 disabled:opacity-60 disabled:cursor-not-allowed"
+                className="flex items-center justify-center gap-2 w-full py-3 rounded-lg text-sm font-bold btn-premium mb-8"
               >
-                {payingPlan === 'basic' ? <><Loader2 className="w-4 h-4 animate-spin" /> Processing…</> : 'Get started'}
+                Get started
               </button>
 
               <ul className="space-y-3 text-sm text-gray-600 flex-1">
@@ -943,7 +929,7 @@ export function Home() {
 
             {/* ── STANDARD ── */}
             <div 
-              onClick={() => handlePay('standard', 'Standard', yearly ? 8 : 9)}
+              onClick={() => handlePay('standard')}
               className="rounded-2xl border border-gray-200 bg-white p-8 h-full flex flex-col cursor-pointer hover:border-indigo-500 hover:shadow-lg transition-all" 
               style={{ boxShadow: '0 1px 4px 0 rgba(30,27,75,0.06)' }}
             >
@@ -963,10 +949,9 @@ export function Home() {
               </div>
 
               <button
-                disabled={!!payingPlan}
-                className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-bold btn-outline-premium mb-8 disabled:opacity-60 disabled:cursor-not-allowed"
+                className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg text-sm font-bold btn-outline-premium mb-8"
               >
-                {payingPlan === 'standard' ? <><Loader2 className="w-4 h-4 animate-spin" /> Processing…</> : 'Get started'}
+                Get started
               </button>
 
               <ul className="space-y-3 text-sm text-gray-600 flex-1">
@@ -990,7 +975,7 @@ export function Home() {
           className="max-w-4xl mx-auto rounded-2xl px-10 py-14 text-center text-white"
           style={{ background: 'linear-gradient(135deg, #5B4FE8 0%, #7C6FEF 100%)' }}
         >
-          <h2 className="text-3xl font-bold mb-3">Ready to extract data the easy way?</h2>
+          <h2 className="text-3xl font-bold mb-3 text-white" style={{ color: '#ffffff' }}>Ready to extract data the easy way?</h2>
           <p className="text-indigo-200 mb-8 text-base">Join thousands of teams already scraping smarter with Scrapify.</p>
           <div className="flex items-center justify-center gap-3 flex-wrap">
             <Link
@@ -1016,41 +1001,41 @@ export function Home() {
       </section>
 
       {/* ── FOOTER ── */}
-      <footer id="contact" className="border-t border-gray-100 bg-[#FAF9FF] py-16 text-gray-500">
+      <footer id="contact" className="border-t border-gray-100 bg-white py-14">
         <div className="max-w-6xl mx-auto px-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-10 mb-10">
             {/* Brand */}
             <div>
               <div className="flex items-center gap-2 mb-4">
-                <img src="/scrapify.png" alt="Scrapify" className="h-14 w-auto object-contain" />
+                <img src="/scrapify_logo.png" alt="Scrapify" className="h-8 w-auto object-contain" />
               </div>
-              <p className="text-sm text-gray-400 leading-relaxed max-w-xs mt-3">
+              <p className="text-sm text-gray-400 leading-relaxed max-w-xs">
                 The professional data extraction platform. Built for modern teams who move fast.
               </p>
             </div>
 
             {/* Product */}
             <div>
-              <h4 className="text-xs font-bold text-gray-800 uppercase tracking-widest mb-5">Product</h4>
-              <ul className="space-y-3.5 text-sm text-gray-400">
-                <li><a href="#features" className="hover:text-indigo-600 transition-colors">Features</a></li>
-                <li><a href="#how-it-works" className="hover:text-indigo-600 transition-colors">How it works</a></li>
-                <li><a href="#faq" className="hover:text-indigo-600 transition-colors">FAQ</a></li>
+              <h4 className="text-sm font-semibold text-gray-900 mb-4">Product</h4>
+              <ul className="space-y-2.5 text-sm text-gray-400">
+                <li><a href="#features" className="hover:text-gray-700 transition-colors">Features</a></li>
+                <li><a href="#how-it-works" className="hover:text-gray-700 transition-colors">How it works</a></li>
+                <li><a href="#faq" className="hover:text-gray-700 transition-colors">FAQ</a></li>
               </ul>
             </div>
 
             {/* Company */}
             <div>
-              <h4 className="text-xs font-bold text-gray-800 uppercase tracking-widest mb-5">Company</h4>
-              <ul className="space-y-3.5 text-sm text-gray-400">
-                <li><a href="#" className="hover:text-indigo-600 transition-colors">About</a></li>
-                <li><a href="#" className="hover:text-indigo-600 transition-colors">Privacy</a></li>
-                <li><a href="mailto:support@scrapify.com" className="hover:text-indigo-600 transition-colors">support@scrapify.com</a></li>
+              <h4 className="text-sm font-semibold text-gray-900 mb-4">Company</h4>
+              <ul className="space-y-2.5 text-sm text-gray-400">
+                <li><a href="#" className="hover:text-gray-700 transition-colors">About</a></li>
+                <li><a href="#" className="hover:text-gray-700 transition-colors">Privacy</a></li>
+                <li><a href="mailto:support@scrapify.com" className="hover:text-gray-700 transition-colors">support@scrapify.com</a></li>
               </ul>
             </div>
           </div>
 
-          <div className="pt-8 border-t border-gray-200/60 flex flex-col sm:flex-row items-center justify-between gap-2">
+          <div className="pt-8 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-2">
             <p className="text-xs text-gray-400">© 2026 Scrapify. All rights reserved.</p>
             <p className="text-xs text-gray-400">Crafted for data teams.</p>
           </div>

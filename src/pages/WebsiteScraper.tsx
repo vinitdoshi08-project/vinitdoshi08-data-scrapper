@@ -1,16 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import { useSubscription, planLabel, planBadgeClass } from '../contexts/SubscriptionContext';
 import { TrialGate } from '../components/TrialGate';
-import { ProfileModal } from '../components/ProfileModal';
+import { AppShell } from '../components/AppShell';
 import { GoogleGenAI } from '@google/genai';
 import {
   MapPin, Search, Loader2, ExternalLink, Navigation, Download, Trash2,
   RefreshCw, Lightbulb, Sparkles, Check, Clipboard, FileSpreadsheet,
   AlertCircle, X, Key, Eye, EyeOff, CheckCircle,
-  Youtube, Globe, Map, LayoutDashboard, User, Settings, Bell, Crown, LogOut,
 } from 'lucide-react';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -176,27 +172,6 @@ Use "N/A" only after genuinely exhaustive searching. Do not fabricate.`;
 
 // ── Main Component ────────────────────────────────────────────────────────────
 export function WebsiteScraper() {
-  const navigate   = useNavigate();
-  const location   = useLocation();
-  const { user, signOut } = useAuth();
-  const { plan, can_scrape, loading: subLoading } = useSubscription() as any;
-
-  const [avatarError, setAvatarError]     = useState(false);
-  const [showSettings, setShowSettings]   = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-
-  const isPaid    = plan === 'basic' || plan === 'standard';
-  const isExpired = !can_scrape;
-  const userInitials = user?.full_name
-    ?.split(' ').filter(Boolean).map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() || 'U';
-
-  const navItems = [
-    { label: 'Dashboard',       icon: LayoutDashboard, path: '/dashboard',       iColor: 'text-indigo-500'  },
-    { label: 'YouTube Scraper', icon: Youtube,          path: '/youtube-scraper', iColor: 'text-red-400'     },
-    { label: 'Website Scraper', icon: Globe,            path: '/website-scraper', iColor: 'text-emerald-500' },
-  ];
-
   // API Key
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('gemini_api_key') || '');
   const [showApiKey, setShowApiKey] = useState(false);
@@ -507,142 +482,38 @@ export function WebsiteScraper() {
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
-    <TrialGate scraperName="Website Scraper">
-    <div className="flex h-screen overflow-hidden" style={{ fontFamily: 'Inter,ui-sans-serif,system-ui,sans-serif', background: 'linear-gradient(135deg,#f0f4ff 0%,#f8faff 45%,#f0fdf8 100%)' }}>
-
-      {/* ══ SIDEBAR ══ */}
-      <aside className={`flex flex-col bg-white border-r border-gray-100 transition-all duration-300 ease-in-out shrink-0 ${sidebarCollapsed ? 'w-[72px]' : 'w-[260px]'}`}
-        style={{ boxShadow: '2px 0 20px rgba(0,0,0,0.035)' }}>
-        <div className={`flex items-center h-[72px] shrink-0 border-b border-gray-200 ${sidebarCollapsed ? 'justify-center px-3' : 'px-5'}`}>
-          {sidebarCollapsed
-            ? <img src="/scrapify.png" alt="S" className="h-10 w-10 object-contain" />
-            : <img src="/scrapify.png" alt="Scrapify" className="h-[52px] w-auto object-contain max-w-[200px]" />}
+    <AppShell>
+      <TrialGate scraperName="Website Scraper">
+        <div className="page">
+      {/* Page heading */}
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">WEBSITE &amp; B2B INTELLIGENCE</p>
+          <h1>Business leads, ready to export</h1>
+          <p className="heading-copy">Find verified business contacts, direct emails and LinkedIn profiles from any website or search.</p>
         </div>
-        <nav className="flex-1 overflow-y-auto px-3 pt-6 pb-2 space-y-6">
-          <div>
-            {!sidebarCollapsed && <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.18em] px-2 mb-2">Workspace</p>}
-            <div className="space-y-1">
-              {navItems.map(item => {
-                const active = location.pathname === item.path;
-                const Icon = item.icon;
-                return (
-                  <button key={item.path} onClick={() => navigate(item.path)}
-                    title={sidebarCollapsed ? item.label : undefined}
-                    className={`w-full flex items-center h-10 rounded-xl text-[13px] font-semibold transition-all duration-150
-                      ${sidebarCollapsed ? 'justify-center' : 'gap-3 px-3'}
-                      ${active ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800'}`}>
-                    <Icon className={`w-[18px] h-[18px] shrink-0 ${active ? 'text-white' : item.iColor}`} />
-                    {!sidebarCollapsed && <span className="truncate leading-none">{item.label}</span>}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-          <div>
-            {!sidebarCollapsed && <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.18em] px-2 mb-2">Account</p>}
-            <div className="space-y-1">
-              {[{ label:'Profile', icon: User, iColor:'text-indigo-400' }, { label:'Settings', icon: Settings, iColor:'text-gray-400' }].map(item => {
-                const Icon = item.icon;
-                return (
-                  <button key={item.label} title={sidebarCollapsed ? item.label : undefined}
-                    onClick={() => setShowSettings(true)}
-                    className={`w-full flex items-center h-10 rounded-xl text-[13px] font-semibold text-gray-500 hover:bg-gray-50 hover:text-gray-800 transition-all duration-150
-                      ${sidebarCollapsed ? 'justify-center' : 'gap-3 px-3'}`}>
-                    <Icon className={`w-[18px] h-[18px] shrink-0 ${item.iColor}`} />
-                    {!sidebarCollapsed && <span className="leading-none">{item.label}</span>}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </nav>
-        {!sidebarCollapsed && (
-          <div className={`mx-3 mb-3 rounded-2xl px-4 py-3.5 border ${subLoading ? 'bg-gray-50 border-gray-100' : isPaid ? 'bg-gradient-to-br from-indigo-50 to-indigo-50/50 border-indigo-100' : 'bg-gradient-to-br from-amber-50 to-amber-50/50 border-amber-100'}`}>
-            {subLoading ? (
-              <div className="flex items-center gap-2 py-0.5">
-                <div className="w-3.5 h-3.5 rounded-full bg-gray-200 animate-pulse shrink-0" />
-                <div className="h-3 w-16 bg-gray-200 rounded animate-pulse" />
-              </div>
-            ) : (
-              <>
-                <div className="flex items-center justify-between mb-0.5">
-                  <div className="flex items-center gap-2">
-                    <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${isPaid ? 'bg-indigo-600' : 'bg-amber-500'}`}>
-                      <Crown className="w-3.5 h-3.5 text-white" />
-                    </div>
-                    <span className={`text-[13px] font-bold ${isPaid ? 'text-indigo-800' : 'text-amber-800'}`}>{planLabel(plan as any)}</span>
-                  </div>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isExpired ? 'bg-red-100 text-red-600' : isPaid ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                    {isExpired ? 'Expired' : 'Active'}
-                  </span>
-                </div>
-                {!isPaid && !isExpired && (
-                  <button onClick={() => navigate('/#pricing')}
-                    className="w-full mt-3 text-[11px] font-bold text-white py-2 rounded-xl hover:opacity-90 transition-opacity"
-                    style={{ background: 'linear-gradient(135deg,#4F46E5,#6D5FE8)' }}>Upgrade Plan</button>
-                )}
-              </>
-            )}
-          </div>
-        )}
-        <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-          className="flex items-center justify-center h-10 border-t border-gray-100 text-gray-400 hover:text-indigo-600 hover:bg-gray-50 transition-colors shrink-0 select-none text-lg font-light">
-          {sidebarCollapsed ? '›' : '‹'}
-        </button>
-      </aside>
-
-      {/* ══ MAIN ══ */}
-      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-
-        {/* Topbar */}
-        <header className="h-[72px] bg-white border-b border-gray-200 flex items-center px-8 shrink-0">
-          <div className="flex-1 min-w-0">
-            <h2 className="text-[15px] font-bold text-gray-900 leading-none">Website Scraper</h2>
-            <p className="text-[11px] text-gray-400 mt-0.5 leading-none">AI-powered lead extractor — find businesses, contacts and emails</p>
-          </div>
-          <div className="flex items-center gap-4">
-            {subLoading
-              ? <span className="hidden sm:inline-flex w-16 h-6 rounded-lg bg-gray-100 animate-pulse" />
-              : <span className={`hidden sm:inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1.5 rounded-lg border ${planBadgeClass(plan as any)}`}>
-                  <Crown className="w-3 h-3" />{planLabel(plan as any)}
-                </span>
-            }
-            <div className="w-px h-5 bg-gray-200" />
-            <button onClick={() => setShowSettings(true)}
-              className="flex items-center gap-2.5 pl-2 pr-4 py-1.5 rounded-xl hover:bg-gray-50 border border-transparent hover:border-gray-200 transition-all">
-              <div className="w-[32px] h-[32px] rounded-full shrink-0 overflow-hidden ring-2 ring-indigo-100 flex items-center justify-center text-white text-[13px] font-bold"
-                style={{ background: 'linear-gradient(135deg,#5B4FE8,#7C6FEF)' }}>
-                {userInitials}
-              </div>
-              <div className="hidden sm:block text-left">
-                <p className="text-[13px] font-semibold text-gray-800 leading-none">{user?.full_name || 'User'}</p>
-                <p className="text-[11px] text-gray-400 leading-none mt-1 truncate max-w-[120px]">{user?.email?.split('@')[0] || ''}</p>
-              </div>
-            </button>
-          </div>
-        </header>
-
-        {/* Scrollable body */}
-        <main className="flex-1 overflow-y-auto p-6">
-        <div className="space-y-5">
+      </div>
+      <div className="space-y-5">
 
           {/* Hero banner */}
-          <div className="rounded-2xl px-8 py-6 flex items-center gap-5"
-            style={{ background:'linear-gradient(135deg,#16a34a 0%,#065f46 100%)', boxShadow:'0 8px 32px -4px rgba(22,163,74,0.25)' }}>
-            <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">
-              <FileSpreadsheet className="w-8 h-8 text-white" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1.5">
-                <span className="px-2 py-0.5 text-[10px] font-bold tracking-widest bg-white/20 text-white rounded-md uppercase">Excel Ready</span>
-                <span className="px-2 py-0.5 text-[10px] font-bold tracking-widest bg-white/20 text-white rounded-md uppercase">AI Powered</span>
+          <div className="rounded-2xl px-6 py-5 md:px-7 md:py-5 flex items-center justify-between gap-5 text-white"
+            style={{ background: 'linear-gradient(135deg, #0f8a44 0%, #0d6f37 100%)', boxShadow: '0 4px 20px -2px rgba(15,138,68,0.25)' }}>
+            <div className="flex items-center gap-4.5 min-w-0">
+              <div className="w-13 h-13 rounded-2xl bg-white/20 flex items-center justify-center shrink-0 border border-white/10 shadow-sm" style={{ width: '52px', height: '52px' }}>
+                <FileSpreadsheet className="w-7 h-7 text-white" />
               </div>
-              <h1 className="text-xl font-bold text-white leading-none">Lead Extractor — Website Scraper</h1>
-              <p className="text-green-200 text-sm mt-1.5">Search businesses by name &amp; location · Extracts contacts, emails · Export to Excel CSV</p>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="px-2.5 py-0.5 text-[10px] font-bold tracking-wider bg-white/20 text-white rounded-md uppercase">Excel Ready</span>
+                  <span className="px-2.5 py-0.5 text-[10px] font-bold tracking-wider bg-white/20 text-white rounded-md uppercase">Ai Powered</span>
+                </div>
+                <h2 className="text-lg md:text-xl font-bold !text-white tracking-tight leading-tight !mb-0" style={{ color: '#ffffff' }}>Lead Extractor — Website Scraper</h2>
+                <p className="text-emerald-100/90 text-xs mt-1 leading-snug" style={{ color: 'rgba(209, 250, 229, 0.9)' }}>Search businesses by name &amp; location · Extracts contacts, emails · Export to Excel CSV</p>
+              </div>
             </div>
-            <div className="hidden md:flex items-center gap-3">
+            <div className="hidden md:flex items-center gap-2.5 shrink-0">
               {['Contacts', 'Emails', 'LinkedIn'].map(t => (
-                <span key={t} className="text-xs font-semibold bg-white/20 text-white px-3 py-1.5 rounded-full">{t}</span>
+                <span key={t} className="text-xs font-medium bg-white/15 hover:bg-white/20 transition-colors text-white px-3.5 py-1.5 rounded-full border border-white/10">{t}</span>
               ))}
             </div>
           </div>
@@ -1089,13 +960,10 @@ export function WebsiteScraper() {
             </div>
           </div>
 
-        </div>{/* end space-y-5 */}
-        </main>
-      </div>{/* end flex-1 main col */}
-
-      {/* Profile / Settings modal */}
-      {showSettings && <ProfileModal onClose={() => setShowSettings(false)} />}
-    </div>{/* end flex h-screen */}
-    </TrialGate>
+        <p className="text-xs text-gray-400 text-center mt-4">Scrapify — clean data, three clicks away.</p>
+        </div>
+      </div>
+      </TrialGate>
+    </AppShell>
   );
 }

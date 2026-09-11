@@ -55,7 +55,7 @@ interface TrialGateProps {
 }
 
 export function TrialGate({ children, scraperName }: TrialGateProps) {
-  const { can_scrape, plan, trial_ends_at, loading } = useSubscription();
+  const { can_scrape, loading } = useSubscription();
   const { user } = useAuth();
   const { refresh } = useSubscription();
   const navigate = useNavigate();
@@ -169,91 +169,48 @@ export function TrialGate({ children, scraperName }: TrialGateProps) {
     }
   }
 
-  if (loading) return (
-    <div className="flex items-center justify-center h-64">
-      <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
-    </div>
-  );
-
-  if (!can_scrape) {
-    return (
-      <>
-        <div className="relative">
-          <div className="pointer-events-none select-none" style={{ filter: 'grayscale(1) opacity(0.35) blur(1.5px)' }}>
-            {children}
-          </div>
-          <div className="absolute inset-0 flex flex-col items-center justify-center z-20 rounded-2xl"
-            style={{ background: 'rgba(248,247,255,0.88)', backdropFilter: 'blur(4px)' }}>
-            <div className="flex flex-col items-center text-center max-w-sm px-6">
-              <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-5"
-                style={{ background: 'linear-gradient(135deg,#5B4FE8,#7C6FEF)', boxShadow: '0 8px 24px rgba(91,79,232,.35)' }}>
-                <Lock className="w-8 h-8 text-white" />
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Free trial ended</h3>
-              <p className="text-sm text-gray-500 mb-1">
-                Your 3-day free trial for <strong>{scraperName}</strong> has expired.
-              </p>
-              <p className="text-sm text-gray-400 mb-6">Upgrade to keep scraping with no limits.</p>
-              <button onClick={() => setShowModal(true)}
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 hover:shadow-lg"
-                style={{ background: 'linear-gradient(135deg,#5B4FE8,#7C6FEF)', boxShadow: '0 4px 18px rgba(91,79,232,.38)' }}>
-                <Sparkles className="w-4 h-4" /> Upgrade your plan <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {showModal && (
-          <UpgradeModal
-            paying={paying} msg={msg} usdToInr={usdToInr}
-            onPay={handlePay}
-            onClose={() => { setShowModal(false); setMsg(null); }}
-            onViewPricing={() => { setShowModal(false); navigate('/#pricing'); }}
-          />
-        )}
-      </>
-    );
-  }
-
   return (
     <>
-      {plan === 'free' && trial_ends_at && (
-        <TrialBanner trialEndsAt={trial_ends_at} onUpgrade={() => setShowModal(true)} />
+      {!loading && !can_scrape && (
+        <div className="max-w-7xl mx-auto px-6 pt-6">
+          <div className="flex items-center justify-between bg-[#feeaed] border border-[#fccdd5] rounded-2xl px-5 py-4 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-[#fde8ec] flex items-center justify-center shrink-0">
+                <Lock className="w-5 h-5 text-[#e0354c]" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-[#8e1d30] m-0">
+                  {scraperName} — Free trial expired
+                </p>
+                <p className="text-xs text-[#b82e46] m-0">
+                  Upgrade your plan to unlock unlimited scrapes and exports.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowModal(true)}
+              className="primary-button text-xs py-2 px-4 shrink-0"
+              style={{ background: 'linear-gradient(100deg, #4554e9, #05a9e3)' }}
+            >
+              <Sparkles className="w-3.5 h-3.5" /> Upgrade now <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
       )}
+
       {children}
+
       {showModal && (
         <UpgradeModal
-          paying={paying} msg={msg} usdToInr={usdToInr}
+          paying={paying}
+          msg={msg}
+          usdToInr={usdToInr}
           onPay={handlePay}
           onClose={() => { setShowModal(false); setMsg(null); }}
-          onViewPricing={() => { setShowModal(false); navigate('/#pricing'); }}
+          onViewPricing={() => { setShowModal(false); navigate('/subscription'); }}
         />
       )}
     </>
-  );
-}
-
-function TrialBanner({ trialEndsAt, onUpgrade }: { trialEndsAt: string; onUpgrade: () => void }) {
-  const daysLeft = Math.max(0, Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / 86_400_000));
-  return (
-    <div className="mx-6 mt-4 mb-0 flex items-center justify-between gap-4 px-4 py-3 rounded-xl border border-amber-200 bg-amber-50">
-      <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
-          <Sparkles className="w-4 h-4 text-amber-600" />
-        </div>
-        <div>
-          <p className="text-sm font-semibold text-amber-800">
-            Free trial — {daysLeft} day{daysLeft !== 1 ? 's' : ''} remaining
-          </p>
-          <p className="text-xs text-amber-600">Upgrade before your trial ends to keep all features.</p>
-        </div>
-      </div>
-      <button onClick={onUpgrade}
-        className="shrink-0 px-4 py-1.5 rounded-lg text-xs font-bold text-white transition-all hover:opacity-90"
-        style={{ background: 'linear-gradient(135deg,#5B4FE8,#7C6FEF)' }}>
-        Upgrade
-      </button>
-    </div>
   );
 }
 

@@ -12,8 +12,7 @@ interface Props {
 }
 
 export function ProfileModal({ onClose }: Props) {
-  const { user, signOut, updateProfile } = useAuth();
-  const { plan, can_scrape, trial_ends_at, billing_cycle, loading: subLoading } =
+  const { user, signOut, updateProfile } = useAuth() as any;  const { plan, can_scrape, trial_ends_at, billing_cycle, loading: subLoading } =
     useSubscription() as any;
   const expires_at = (useSubscription() as any).expires_at ?? null;
   const navigate = useNavigate();
@@ -24,7 +23,7 @@ export function ProfileModal({ onClose }: Props) {
   const [profileError, setProfileError] = useState('');
   const [isUpdating, setIsUpdating]     = useState(false);
   const [savedOk, setSavedOk]           = useState(false);
-  const [showLogout, setShowLogout]     = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   useEffect(() => {
     if (user) { setEditName(user.full_name || ''); setEditEmail(user.email || ''); }
@@ -71,33 +70,6 @@ export function ProfileModal({ onClose }: Props) {
 
   const FF = 'Inter,ui-sans-serif,system-ui,sans-serif';
 
-  /* ── Logout confirmation overlay ── */
-  if (showLogout) {
-    return (
-      <div className="fixed inset-0 z-[200] flex items-center justify-center p-4"
-        style={{ background: 'rgba(15,15,30,0.7)', backdropFilter: 'blur(10px)', fontFamily: FF }}>
-        <div className="bg-white rounded-2xl p-8 max-w-xs w-full shadow-2xl text-center"
-          style={{ boxShadow: '0 32px 80px rgba(0,0,0,0.22)' }}>
-          <div className="w-16 h-16 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-5 border border-red-100">
-            <LogOut className="w-7 h-7 text-red-500" />
-          </div>
-          <h3 className="text-[18px] font-bold text-gray-900 mb-1.5">Sign Out?</h3>
-          <p className="text-sm text-gray-400 mb-6 leading-relaxed">You'll need to sign in again to access your account.</p>
-          <div className="flex gap-3">
-            <button onClick={() => setShowLogout(false)}
-              className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">
-              Cancel
-            </button>
-            <button onClick={handleSignOut}
-              className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white bg-red-500 hover:bg-red-600 transition-colors">
-              Sign Out
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4"
       style={{ background: 'rgba(15,15,30,0.65)', backdropFilter: 'blur(10px)', fontFamily: FF }}
@@ -124,15 +96,23 @@ export function ProfileModal({ onClose }: Props) {
             style={{ background: 'rgba(255,255,255,0.03)' }} />
 
           <div className="relative flex items-center gap-5">
-            {/* Avatar — initials only, large and beautiful */}
-            <div className="shrink-0 w-[72px] h-[72px] rounded-2xl flex items-center justify-center text-white text-2xl font-extrabold shadow-xl"
-              style={{
-                background: 'rgba(255,255,255,0.15)',
-                border: '2.5px solid rgba(255,255,255,0.3)',
-                backdropFilter: 'blur(8px)',
-                letterSpacing: '-0.03em',
-              }}>
-              {userInitials}
+            {/* Avatar — shows photo if uploaded, else initials */}
+            <div className="shrink-0">
+              {user?.avatar_url ? (
+                <img src={user.avatar_url} alt="avatar"
+                  className="w-[72px] h-[72px] rounded-2xl object-cover shadow-xl"
+                  style={{ border: '2.5px solid rgba(255,255,255,0.3)' }} />
+              ) : (
+                <div className="w-[72px] h-[72px] rounded-2xl flex items-center justify-center text-white text-2xl font-extrabold shadow-xl"
+                  style={{
+                    background: 'rgba(255,255,255,0.15)',
+                    border: '2.5px solid rgba(255,255,255,0.3)',
+                    backdropFilter: 'blur(8px)',
+                    letterSpacing: '-0.03em',
+                  }}>
+                  {userInitials}
+                </div>
+              )}
             </div>
 
             {/* Name + email + badges */}
@@ -224,7 +204,7 @@ export function ProfileModal({ onClose }: Props) {
               <div className="grid grid-cols-3 gap-2">
                 {[
                   { label: 'Plan',    value: subLoading ? '…' : planLabel(plan as any).split(' ')[0], icon: <Crown className="w-3.5 h-3.5 text-indigo-500" />, color: 'text-indigo-600' },
-                  { label: 'Status',  value: subLoading ? '…' : planStatus,                           icon: <Zap className="w-3.5 h-3.5 text-emerald-500" />, color: 'text-emerald-600' },
+                  { label: 'Status',  value: subLoading ? '…' : planStatus,                           icon: <Zap className="w-3.5 h-3.5 text-emerald-500" />,  color: 'text-emerald-600' },
                   { label: 'Billing', value: subLoading ? '…' : isPaid ? (billing_cycle === 'yearly' ? 'Yearly' : 'Monthly') : 'Trial', icon: <Calendar className="w-3.5 h-3.5 text-amber-500" />, color: 'text-amber-600' },
                 ].map(s => (
                   <div key={s.label} className="flex flex-col items-center gap-1.5 bg-gray-50 border border-gray-100 rounded-xl py-3.5 px-2 text-center hover:border-gray-200 transition-colors">
@@ -243,7 +223,9 @@ export function ProfileModal({ onClose }: Props) {
                 style={{ background: 'linear-gradient(135deg,#4F46E5,#6D5FE8)' }}>
                 <Edit2 className="w-4 h-4" /> Edit Profile
               </button>
-              <button onClick={() => setShowLogout(true)}
+
+              {/* Sign out — shows confirm popup */}
+              <button onClick={() => setShowLogoutConfirm(true)}
                 className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-[13px] font-semibold text-red-500 border border-red-100 hover:bg-red-50 hover:border-red-200 transition-colors">
                 <LogOut className="w-4 h-4" /> Sign Out
               </button>
@@ -292,7 +274,7 @@ export function ProfileModal({ onClose }: Props) {
 
               <div className="flex gap-3 pt-1">
                 <button type="button"
-                  onClick={() => { setTab('profile'); setProfileError(''); setEditName(user?.full_name||''); setEditEmail(user?.email||''); }}
+                  onClick={() => { setTab('profile'); setProfileError(''); setEditName(user?.full_name || ''); setEditEmail(user?.email || ''); }}
                   className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">
                   Cancel
                 </button>
@@ -308,6 +290,30 @@ export function ProfileModal({ onClose }: Props) {
           )}
         </div>
       </div>
+
+      {/* Sign out confirm overlay */}
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4"
+          style={{ background: 'rgba(15,15,30,0.6)', backdropFilter: 'blur(6px)', fontFamily: FF }}>
+          <div className="bg-white rounded-2xl p-7 max-w-xs w-full shadow-2xl text-center">
+            <div className="w-12 h-12 rounded-full bg-orange-50 flex items-center justify-center mx-auto mb-4">
+              <LogOut className="w-6 h-6 text-orange-500" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 mb-1">Sign out?</h3>
+            <p className="text-sm text-gray-400 mb-5">You'll need to sign in again to access your account.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setShowLogoutConfirm(false)}
+                className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">
+                Cancel
+              </button>
+              <button onClick={handleSignOut}
+                className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white bg-gray-800 hover:bg-gray-900 transition-colors">
+                Sign out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
