@@ -102,7 +102,7 @@ export function Subscription() {
   const [payments, setPayments]     = useState<Payment[]>([]);
   const [loadingPay, setLoadingPay] = useState(false);
   const [modal, setModal]           = useState<null | 'stop' | 'cancel_upcoming' | {
-    action: 'upgrade'|'downgrade'|'renewal'|'new'; planId: string; planName: string;
+    action: 'upgrade'|'downgrade'|'renewal'|'new'|'upgrade_cycle'; planId: string; planName: string;
     startsOn?: string; usdAmt: number; payLabel: string;
   }>(null);
 
@@ -172,9 +172,18 @@ export function Subscription() {
 
   // ── Choose plan → open modal ──────────────────────────────
   function handleChoosePlan(p: typeof PLANS[number]) {
+    // If user is currently on an active Yearly plan, they cannot degrade to Monthly
+    if (isPaid && !isExpired && billing_cycle === 'yearly' && !yearly) {
+      setMsg({
+        type: 'error',
+        text: 'Your account is currently on an active Yearly plan. Switching to a Monthly billing cycle is not allowed until your yearly period concludes.',
+      });
+      return;
+    }
+
     const usdAmt   = yearly ? p.yearly.usd * 12 : p.monthly.usd;
     const payLabel = yearly ? p.yearly.total : `${p.monthly.label}/mo`;
-    const action   = getAction(p.id);
+    const action   = (isPaid && plan === p.id && billing_cycle === 'monthly' && yearly) ? 'upgrade_cycle' : getAction(p.id);
     const startsOn = (action === 'renewal' || action === 'downgrade') ? fmtDate(expires_at) : undefined;
     setMsg(null);
     setModal({ action, planId: p.id, planName: p.name, startsOn, usdAmt, payLabel });
@@ -409,7 +418,7 @@ export function Subscription() {
                 Monthly
               </button>
               <button onClick={() => setYearly(true)} className={yearly ? 'selected' : ''}>
-                Yearly <span>SAVE 16%</span>
+                Yearly <span>SAVE 20%</span>
               </button>
             </div>
           </div>
@@ -426,25 +435,43 @@ export function Subscription() {
               const usdAmt   = yearly ? p.yearly.usd * 12 : p.monthly.usd;
               const inrAmt   = Math.round(usdAmt * usdToInr);
               const usdLabel = yearly ? p.yearly.label : p.monthly.label;
-              const isCurrent = plan === p.id && !isExpired;
-              const isActiveAbove = !isExpired && isPaid && planRank(p.id) < planRank(plan);
-              const isDisabled = paying === p.id || (!!paying && paying !== p.id);
+              const isSamePlanAndCycle = plan === p.id && !isExpired && (billing_cycle === (yearly ? 'yearly' : 'monthly'));
+              const isDowngradeCycle = isPaid && !isExpired && billing_cycle === 'yearly' && !yearly;
+              const isDisabled = paying === p.id || (!!paying && paying !== p.id) || isDowngradeCycle || isSamePlanAndCycle;
+              const isUpgradeToYearly = isPaid && !isExpired && billing_cycle === 'monthly' && yearly;
 
               return (
-                <div key={p.id} className={`pricing-card ${isCurrent ? 'selected-plan' : p.id === 'standard' ? 'featured-plan' : ''}`}>
+                <div key={p.id} className={`pricing-card ${isSamePlanAndCycle ? 'selected-plan' : p.id === 'standard' ? 'featured-plan' : ''} ${isDowngradeCycle ? 'opacity-60 cursor-not-allowed' : ''}`}>
                   <div className="plan-tags">
-                    {isCurrent && <span className="featured-tag">✓ Current Plan</span>}
-                    {isActiveAbove && <span className="included-tag">✓ Included in higher tier</span>}
-                    {p.id === 'standard' && !isCurrent && <span className="featured-tag">Most Popular</span>}
+                    {isSamePlanAndCycle && <span className="featured-tag">✓ Current Plan</span>}
+                    {isUpgradeToYearly && (
+                      <span
+                        className="featured-tag"
+                        style={{
+                          background: 'linear-gradient(135deg, #059669, #10b981)',
+                          color: '#ffffff',
+                          fontWeight: 700,
+                          letterSpacing: '0.02em',
+                          boxShadow: '0 2px 6px rgba(16, 185, 129, 0.35)',
+                        }}
+                      >
+                        Switch to Yearly (Save 20%)
+                      </span>
+                    )}
+                    {isDowngradeCycle && <span className="included-tag">Yearly active</span>}
+                    {p.id === 'standard' && !isSamePlanAndCycle && !isUpgradeToYearly && <span className="featured-tag">Most Popular</span>}
                     <span className="auto-tag">Auto-renew</span>
                   </div>
 
                   <p className="plan-name">{p.name}</p>
                   <div className="price-line">
-                    <strong>{usdLabel}</strong>
-                    <span>/month</span>
+                    <strong>{yearly ? (p.id === 'basic' ? '$60' : '$96') : usdLabel}</strong>
+                    <span>{yearly ? '/year' : '/month'}</span>
                   </div>
-                  <p className="currency-note">≈ ₹{inrAmt.toLocaleString('en-IN')}{yearly ? ' yearly' : '/mo'}</p>
+                  <p className="currency-note">
+                    ≈ ₹{inrAmt.toLocaleString('en-IN')}{yearly ? '/yr' : '/mo'}
+                    {yearly && <span style={{ marginLeft: 6, color: '#10b981', fontWeight: 600 }}>(Just {usdLabel}/mo · Save $12/yr)</span>}
+                  </p>
 
                   <ul>
                     {p.features.map(f => (
@@ -457,12 +484,16 @@ export function Subscription() {
                   <button
                     onClick={() => !isDisabled && handleChoosePlan(p)}
                     disabled={isDisabled}
-                    className={isCurrent ? 'selected-plan-button' : 'primary-button w-full'}
+                    className={isSamePlanAndCycle ? 'selected-plan-button' : isDowngradeCycle ? 'secondary-button w-full cursor-not-allowed opacity-60' : 'primary-button w-full'}
                   >
                     {paying === p.id ? (
                       <><Loader2 className="w-4 h-4 spin" /> Processing...</>
-                    ) : isCurrent ? (
-                      `Active (${p.name})`
+                    ) : isSamePlanAndCycle ? (
+                      `Active (${p.name} ${billing_cycle === 'yearly' ? 'Yearly' : 'Monthly'})`
+                    ) : isUpgradeToYearly ? (
+                      `Switch to ${p.name} Yearly →`
+                    ) : isDowngradeCycle ? (
+                      'Yearly plan active'
                     ) : (
                       `Select ${p.name}`
                     )}
@@ -588,8 +619,8 @@ export function Subscription() {
         return (
           <ActionModal
             icon={<Sparkles className="w-6 h-6" />}
-            title={`Activate ${m.planName} Plan`}
-            desc={`Your subscription will be set to ${m.planName} (${m.payLabel}). Ready to proceed?`}
+            title={m.action === 'upgrade_cycle' ? `Upgrade to ${m.planName} Yearly` : `Activate ${m.planName} Plan`}
+            desc={m.action === 'upgrade_cycle' ? `Upgrade your active ${m.planName} plan to Yearly (${m.payLabel}). You save 20%!` : `Your subscription will be set to ${m.planName} (${m.payLabel}). Ready to proceed?`}
             confirmLabel={`Pay & Activate`}
             onConfirm={handlePay}
             onCancel={() => setModal(null)}

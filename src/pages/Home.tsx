@@ -900,15 +900,15 @@ export function Home() {
               <div className="min-h-[140px]">
                 <p className="text-xs font-semibold text-indigo-500 uppercase tracking-widest mb-4">Basic</p>
                 <div className="flex items-end gap-1 mb-1">
-                  <span className="text-4xl font-bold text-gray-900">${yearly ? '5' : '6'}</span>
-                  <span className="text-sm text-gray-400 mb-1.5">/mo</span>
+                  <span className="text-4xl font-bold text-gray-900">${yearly ? '60' : '6'}</span>
+                  <span className="text-sm text-gray-400 mb-1.5">{yearly ? '/yr' : '/mo'}</span>
                 </div>
                 {/* Live INR equivalent */}
                 <p className="text-xs text-indigo-400 font-semibold mb-1">
-                  {rateLoaded ? inrEquiv(yearly ? 5 : 6) + '/mo' : '…'} · charged at live rate
+                  {rateLoaded ? inrEquiv(yearly ? 60 : 6) + (yearly ? '/yr' : '/mo') : '…'} · charged at live rate
                 </p>
                 {yearly
-                  ? <p className="text-xs text-emerald-500 font-semibold mb-4">Billed $60/yr · Save $12</p>
+                  ? <p className="text-xs text-emerald-500 font-semibold mb-4">Just $5/mo · Save $12/yr</p>
                   : <p className="text-xs text-gray-400 mb-4">Billed monthly</p>}
               </div>
 
@@ -936,15 +936,15 @@ export function Home() {
               <div className="min-h-[140px]">
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4">Standard</p>
                 <div className="flex items-end gap-1 mb-1">
-                  <span className="text-4xl font-bold text-gray-900">${yearly ? '8' : '9'}</span>
-                  <span className="text-sm text-gray-400 mb-1.5">/mo</span>
+                  <span className="text-4xl font-bold text-gray-900">${yearly ? '96' : '9'}</span>
+                  <span className="text-sm text-gray-400 mb-1.5">{yearly ? '/yr' : '/mo'}</span>
                 </div>
                 {/* Live INR equivalent */}
                 <p className="text-xs text-indigo-400 font-semibold mb-1">
-                  {rateLoaded ? inrEquiv(yearly ? 8 : 9) + '/mo' : '…'} · charged at live rate
+                  {rateLoaded ? inrEquiv(yearly ? 96 : 9) + (yearly ? '/yr' : '/mo') : '…'} · charged at live rate
                 </p>
                 {yearly
-                  ? <p className="text-xs text-emerald-500 font-semibold mb-4">Billed $96/yr · Save $12</p>
+                  ? <p className="text-xs text-emerald-500 font-semibold mb-4">Just $8/mo · Save $12/yr</p>
                   : <p className="text-xs text-gray-400 mb-4">Billed monthly</p>}
               </div>
 

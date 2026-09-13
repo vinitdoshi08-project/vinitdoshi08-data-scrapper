@@ -19,8 +19,8 @@ const PLANS = [
   {
     id:        'standard' as const,
     name:      'Standard',
-    usdPrice:  10,       // $10/mo displayed
-    usdLabel:  '$10',
+    usdPrice:  9,        // $9/mo displayed
+    usdLabel:  '$9',
     features:  ['Everything in Basic', 'Unlimited team members', 'Advanced analytics', 'Custom exports', 'SLA guarantee'],
     highlight: false,
   },
@@ -198,7 +198,49 @@ export function TrialGate({ children, scraperName }: TrialGateProps) {
         </div>
       )}
 
-      {children}
+      {!loading && !can_scrape ? (
+        <div className="relative">
+          {/* Grayed out & disabled scraper UI */}
+          <div className="opacity-40 pointer-events-none filter grayscale-[40%] select-none">
+            {children}
+          </div>
+
+          {/* Locked Overlay Banner */}
+          <div className="absolute inset-0 top-12 z-20 flex flex-col items-center justify-start pt-16 px-4 pointer-events-auto">
+            <div className="bg-white/95 backdrop-blur-md border border-amber-200/90 shadow-2xl rounded-2xl p-8 max-w-md w-full text-center animate-in fade-in zoom-in duration-300">
+              <div className="w-14 h-14 rounded-2xl bg-amber-100/80 border border-amber-200 mx-auto mb-4 flex items-center justify-center text-amber-600">
+                <Lock className="w-7 h-7" />
+              </div>
+              <span className="inline-block text-[11px] font-bold uppercase tracking-wider text-amber-700 bg-amber-50 px-3 py-1 rounded-full border border-amber-200 mb-3">
+                Free Trial Expired (3 Days)
+              </span>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">
+                Upgrade your plan
+              </h3>
+              <p className="text-sm text-gray-600 mb-6 leading-relaxed">
+                Your 3-day free trial has expired. To continue extracting leads, scraping YouTube, and exporting files, please upgrade your subscription.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={() => setShowModal(true)}
+                  className="flex-1 primary-button text-sm justify-center py-2.5 px-4 shadow-md font-semibold"
+                  style={{ background: 'linear-gradient(100deg, #4554e9, #05a9e3)' }}
+                >
+                  <Sparkles className="w-4 h-4" /> Upgrade Plan
+                </button>
+                <button
+                  onClick={() => navigate('/subscription')}
+                  className="px-4 py-2.5 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 text-sm font-semibold transition-colors"
+                >
+                  View Pricing
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        children
+      )}
 
       {showModal && (
         <UpgradeModal

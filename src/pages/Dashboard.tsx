@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import {
   Youtube, Globe, Map, ArrowRight, Plus, AlertTriangle,
-  Loader2, Check, Sparkles, Database, TrendingUp, X, Crown,
+  Loader2, Check, Sparkles, Database, TrendingUp, X, Crown, Lock,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
@@ -48,7 +48,7 @@ function loadRzpScript(): Promise<void> {
 
 export function Dashboard() {
   const { user } = useAuth();
-  const { can_scrape, loading: subLoading, refresh } = useSubscription() as any;
+  const { plan, can_scrape, loading: subLoading, billing_cycle, refresh } = useSubscription() as any;
   const navigate = useNavigate();
 
   const [showUpgrade,   setShowUpgrade]   = useState(false);
@@ -60,9 +60,19 @@ export function Dashboard() {
   useEffect(() => { fetchUsdToInrRate().then(setUsdToInr); }, []);
 
   const isExpired = !can_scrape && !subLoading;
+  const isPaid = plan === 'basic' || plan === 'standard';
   const firstName = user?.full_name?.split(' ')[0] || 'Jordan';
 
   async function handlePay(p: typeof UPGRADE_PLANS[0]) {
+    // If active on yearly plan, user cannot switch to monthly
+    if (isPaid && !isExpired && billing_cycle === 'yearly' && !yearlyBilling) {
+      setUpgradeMsg({
+        type: 'error',
+        text: 'Your account is on an active Yearly plan. Switching to Monthly is not permitted until your yearly plan ends.',
+      });
+      return;
+    }
+
     const usdPrice = yearlyBilling ? p.yearly.usd * 12 : p.monthly.usd;
     const billingLabel = yearlyBilling ? `${p.yearly.total}` : `${p.monthly.label}/mo`;
     setUpgradeMsg(null);
@@ -142,7 +152,13 @@ export function Dashboard() {
             <p className="heading-copy">Turn public web data into clean, useful lists in a few clicks.</p>
           </div>
           <button
-            onClick={() => navigate('/youtube-scraper')}
+            onClick={() => {
+              if (isExpired) {
+                setShowUpgrade(true);
+              } else {
+                navigate('/youtube-scraper');
+              }
+            }}
             className="primary-button"
           >
             <Plus className="w-4 h-4" /> New scrape <ArrowRight className="w-3.5 h-3.5" />
@@ -155,8 +171,8 @@ export function Dashboard() {
             <div className="flex items-center gap-3">
               <AlertTriangle className="w-5 h-5 text-[#d23a52] shrink-0" />
               <div>
-                <p className="text-sm font-semibold text-[#8e1d30]">Trial expired</p>
-                <p className="text-xs text-[#b82e46]">Your free trial has ended. Upgrade to keep using scrapers without limits.</p>
+                <p className="text-sm font-semibold text-[#8e1d30]">Free trial expired</p>
+                <p className="text-xs text-[#b82e46]">Your 3-day free trial has ended. Upgrade your plan to unlock all scrapers and export without limits.</p>
               </div>
             </div>
             <button
@@ -180,10 +196,16 @@ export function Dashboard() {
               work and gives you a tidy spreadsheet.
             </p>
             <button
-              onClick={() => navigate('/map-scraper')}
+              onClick={() => {
+                if (isExpired) {
+                  setShowUpgrade(true);
+                } else {
+                  navigate('/map-scraper');
+                }
+              }}
               className="light-button"
             >
-              Start with Map Scraper <ArrowRight className="w-4 h-4" />
+              {isExpired ? 'Upgrade to access Map Scraper' : 'Start with Map Scraper'} <ArrowRight className="w-4 h-4" />
             </button>
           </div>
 
@@ -219,32 +241,67 @@ export function Dashboard() {
         <div className="workflow-grid">
           {/* 1. YouTube Scraper */}
           <div
-            onClick={() => navigate('/youtube-scraper')}
-            className="workflow-card cursor-pointer group"
+            onClick={() => {
+              if (isExpired) {
+                setShowUpgrade(true);
+              } else {
+                navigate('/youtube-scraper');
+              }
+            }}
+            className={`workflow-card group ${isExpired ? 'opacity-65 grayscale-[40%] hover:grayscale-0 border-amber-200/80 bg-slate-50/80' : 'cursor-pointer'}`}
+            style={isExpired ? { cursor: 'pointer', borderColor: '#fde68a' } : {}}
           >
-            <div className="card-icon red">
-              <Youtube className="w-5 h-5" />
+            <div className="flex items-center justify-between">
+              <div className={`card-icon red ${isExpired ? '!bg-slate-200 !text-slate-500' : ''}`}>
+                <Youtube className="w-5 h-5" />
+              </div>
+              {isExpired && (
+                <span className="flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-100/90 px-2.5 py-1 rounded-full border border-amber-300/60">
+                  <Lock className="w-3 h-3" /> Locked
+                </span>
+              )}
             </div>
             <div className="card-label">
               <span>YOUTUBE SCRAPER</span>
             </div>
-            <strong>Video data &amp; stats</strong>
+            <strong>Video data & stats</strong>
             <p>
               Extract video titles, channels, view counts, likes and upload dates by keyword or channel URL.
             </p>
-            <div className="card-link red-text">
-              <span>Open workflow</span>
-              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-            </div>
+            {isExpired ? (
+              <div className="card-link" style={{ color: '#d97706', fontWeight: 700 }}>
+                <span>Upgrade your plan</span>
+                <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+              </div>
+            ) : (
+              <div className="card-link red-text">
+                <span>Open workflow</span>
+                <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+              </div>
+            )}
           </div>
 
           {/* 2. Website Scraper */}
           <div
-            onClick={() => navigate('/website-scraper')}
-            className="workflow-card cursor-pointer group"
+            onClick={() => {
+              if (isExpired) {
+                setShowUpgrade(true);
+              } else {
+                navigate('/website-scraper');
+              }
+            }}
+            className={`workflow-card group ${isExpired ? 'opacity-65 grayscale-[40%] hover:grayscale-0 border-amber-200/80 bg-slate-50/80' : 'cursor-pointer'}`}
+            style={isExpired ? { cursor: 'pointer', borderColor: '#fde68a' } : {}}
           >
-            <div className="card-icon green">
-              <Globe className="w-5 h-5" />
+            <div className="flex items-center justify-between">
+              <div className={`card-icon green ${isExpired ? '!bg-slate-200 !text-slate-500' : ''}`}>
+                <Globe className="w-5 h-5" />
+              </div>
+              {isExpired && (
+                <span className="flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-100/90 px-2.5 py-1 rounded-full border border-amber-300/60">
+                  <Lock className="w-3 h-3" /> Locked
+                </span>
+              )}
             </div>
             <div className="card-label">
               <span>WEBSITE SCRAPER</span>
@@ -253,32 +310,63 @@ export function Dashboard() {
             <p>
               Crawl any site to extract verified emails, phone numbers, social profiles, and link hierarchies.
             </p>
-            <div className="card-link green-text">
-              <span>Open workflow</span>
-              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-            </div>
+            {isExpired ? (
+              <div className="card-link" style={{ color: '#d97706', fontWeight: 700 }}>
+                <span>Upgrade your plan</span>
+                <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+              </div>
+            ) : (
+              <div className="card-link green-text">
+                <span>Open workflow</span>
+                <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+              </div>
+            )}
           </div>
 
           {/* 3. Map Scraper */}
           <div
-            onClick={() => navigate('/map-scraper')}
-            className="workflow-card cursor-pointer group"
+            onClick={() => {
+              if (isExpired) {
+                setShowUpgrade(true);
+              } else {
+                navigate('/map-scraper');
+              }
+            }}
+            className={`workflow-card group ${isExpired ? 'opacity-65 grayscale-[40%] hover:grayscale-0 border-amber-200/80 bg-slate-50/80' : 'cursor-pointer'}`}
+            style={isExpired ? { cursor: 'pointer', borderColor: '#fde68a' } : {}}
           >
-            <div className="card-icon blue">
-              <Map className="w-5 h-5" />
+            <div className="flex items-center justify-between">
+              <div className={`card-icon blue ${isExpired ? '!bg-slate-200 !text-slate-500' : ''}`}>
+                <Map className="w-5 h-5" />
+              </div>
+              {isExpired ? (
+                <span className="flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-100/90 px-2.5 py-1 rounded-full border border-amber-300/60">
+                  <Lock className="w-3 h-3" /> Locked
+                </span>
+              ) : (
+                <div className="card-label !p-0 !m-0">
+                  <span className="new-label">NEW</span>
+                </div>
+              )}
             </div>
             <div className="card-label">
               <span>MAP SCRAPER</span>
-              <span className="new-label">NEW</span>
             </div>
             <strong>Local business leads</strong>
             <p>
               Search places, restaurants, agencies or shops. Extract addresses, ratings, phone numbers and websites.
             </p>
-            <div className="card-link">
-              <span>Open workflow</span>
-              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-            </div>
+            {isExpired ? (
+              <div className="card-link" style={{ color: '#d97706', fontWeight: 700 }}>
+                <span>Upgrade your plan</span>
+                <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+              </div>
+            ) : (
+              <div className="card-link">
+                <span>Open workflow</span>
+                <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+              </div>
+            )}
           </div>
         </div>
 
@@ -376,10 +464,17 @@ export function Dashboard() {
                       }`}
                     >
                       <h4 className="font-bold text-[#172033] text-base mb-1">{p.name}</h4>
-                      <div className="flex items-baseline gap-1 mb-3">
-                        <span className="text-2xl font-bold text-[#172033]">{priceLabel}</span>
-                        <span className="text-xs text-[#758198]">/month</span>
+                      <div className="flex items-baseline gap-1 mb-1">
+                        <span className="text-2xl font-bold text-[#172033]">
+                          {yearlyBilling ? (p.id === 'basic' ? '$60' : '$96') : priceLabel}
+                        </span>
+                        <span className="text-xs text-[#758198]">{yearlyBilling ? '/year' : '/month'}</span>
                       </div>
+                      {yearlyBilling && (
+                        <p className="text-[11px] text-emerald-600 font-semibold mb-3">
+                          Just {p.yearly.label}/mo · Save $12/yr
+                        </p>
+                      )}
                       <ul className="space-y-2 mb-5">
                         {p.features.map((f, i) => (
                           <li key={i} className="flex items-center gap-2 text-xs text-[#526078]">
@@ -388,13 +483,39 @@ export function Dashboard() {
                           </li>
                         ))}
                       </ul>
-                      <button
-                        onClick={() => handlePay(p)}
-                        disabled={paying === p.id}
-                        className="w-full primary-button py-2.5 text-xs"
-                      >
-                        {paying === p.id ? <Loader2 className="w-4 h-4 spin" /> : `Select ${p.name}`}
-                      </button>
+                      {(() => {
+                        const isSamePlanAndCycle = isPaid && !isExpired && plan === p.id && (billing_cycle === (yearlyBilling ? 'yearly' : 'monthly'));
+                        const isUpgradeToYearly = isPaid && !isExpired && billing_cycle === 'monthly' && yearlyBilling;
+                        const isDowngradeCycle = isPaid && !isExpired && billing_cycle === 'yearly' && !yearlyBilling;
+                        const isDisallowed = isDowngradeCycle || isSamePlanAndCycle;
+                        const isBtnDisabled = paying === p.id || isDisallowed;
+
+                        return (
+                          <button
+                            onClick={() => handlePay(p)}
+                            disabled={isBtnDisabled}
+                            className={`w-full py-2.5 text-xs font-bold rounded-xl transition-all ${
+                              isSamePlanAndCycle
+                                ? 'bg-gray-100 text-gray-500 border border-gray-200 cursor-default'
+                                : isDisallowed
+                                  ? 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed'
+                                  : 'primary-button'
+                            }`}
+                          >
+                            {paying === p.id ? (
+                              <Loader2 className="w-4 h-4 spin mx-auto" />
+                            ) : isSamePlanAndCycle ? (
+                              `Active (${p.name} ${billing_cycle === 'yearly' ? 'Yearly' : 'Monthly'})`
+                            ) : isUpgradeToYearly ? (
+                              `Switch to ${p.name} Yearly →`
+                            ) : isDowngradeCycle ? (
+                              'Yearly plan active'
+                            ) : (
+                              `Select ${p.name}`
+                            )}
+                          </button>
+                        );
+                      })()}
                     </div>
                   );
                 })}

@@ -7,6 +7,7 @@ interface User {
   email: string;
   created_at: string;
   avatar_url?: string;
+  phone?: string;
 }
 
 interface AuthContextType {
@@ -15,11 +16,12 @@ interface AuthContextType {
   error: string | null;
   signup: (fullName: string, email: string, password: string) => Promise<void>;
   signin: (email: string, password: string) => Promise<void>;
-  updateProfile: (fullName: string, email: string) => Promise<void>;
+  updateProfile: (fullName: string, email: string, phone?: string) => Promise<void>;
   uploadAvatar: (file: File) => Promise<void>;
   deleteAccount: () => Promise<void>;
   signOut: () => Promise<void>;
   clearError: () => void;
+  resetPassword: (email: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -58,13 +60,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       full_name: authUser.user_metadata?.full_name || '',
       created_at: authUser.created_at || new Date().toISOString(),
       avatar_url: authUser.user_metadata?.avatar_url || '',
+      phone: authUser.user_metadata?.phone || '',
     };
     setUser(optimistic);
 
     try {
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .select('id, full_name, created_at, avatar_url')
+        .select('id, full_name, created_at, avatar_url, phone')
         .eq('id', authUser.id)
         .maybeSingle();
 
@@ -80,6 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           full_name:  profile.full_name || authUser.user_metadata?.full_name || '',
           created_at: profile.created_at || authUser.created_at,
           avatar_url: profile.avatar_url || authUser.user_metadata?.avatar_url || '',
+          phone:      profile.phone || authUser.user_metadata?.phone || '',
         });
       }
     } catch (err) {
@@ -96,13 +100,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) throw new Error('Invalid email format');
       if (password.length < 6) throw new Error('Password must be at least 6 characters');
 
-      const { error: signupError } = await supabase.auth.signUp({
-        email,
+      const { data: signupData, error: signupError } = await supabase.auth.signUp({
+        email: email.trim(),
         password,
-        options: { data: { full_name: fullName.trim() } },
+        options: {
+          data: {
+            full_name: fullName.trim(),
+          },
+        },
       });
 
-      if (signupError) throw signupError;
+      if (signupError) {
+        if (
+          signupError.message.toLowerCase().includes('already registered') ||
+          signupError.message.toLowerCase().includes('already been registered') ||
+          signupError.message.toLowerCase().includes('user already exists')
+        ) {
+          throw new Error('An account with this email already exists. Please log in instead.');
+        }
+        throw signupError;
+      }
+
+      // In Supabase, if email confirmation is enabled and the user already exists,
+      // signUp may return a user with an empty identities array rather than throwing an error.
+      if (signupData?.user && signupData.user.identities && signupData.user.identities.length === 0) {
+        throw new Error('An account with this email already exists. Please log in instead.');
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Signup failed';
       setError(message);
@@ -113,36 +136,65 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function signin(email: string, password: string) {
     try {
       setError(null);
-      if (!email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) throw new Error('Invalid email format');
-      if (!password) throw new Error('Password is required');
+      const { error: signinError } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
 
-      const { error: signinError } = await supabase.auth.signInWithPassword({ email, password });
       if (signinError) throw signinError;
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Login failed';
+      const message = err instanceof Error ? err.message : 'Signin failed';
       setError(message);
       throw err;
     }
   }
 
-  async function updateProfile(fullName: string, email: string) {
+  async function updateProfile(fullName: string, email: string, phone?: string) {
     try {
       setError(null);
       if (!user) throw new Error('Not authenticated');
       if (!fullName.trim()) throw new Error('Full name is required');
 
+      const metaUpdate: Record<string, any> = { full_name: fullName.trim() };
+      if (phone !== undefined) metaUpdate.phone = phone.trim();
+
+      // 1. Update Auth metadata in Supabase
       const { error: authError } = await supabase.auth.updateUser({
         email: email.trim(),
-        data: { full_name: fullName.trim() },
+        data: metaUpdate,
       });
       if (authError) throw authError;
 
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .upsert({ id: user.id, full_name: fullName.trim() }, { onConflict: 'id' });
-      if (profileError) throw profileError;
+      // 2. Direct client update on profiles table
+      const profilePayload: Record<string, any> = {
+        full_name: fullName.trim(),
+        updated_at: new Date().toISOString(),
+      };
+      if (phone !== undefined) profilePayload.phone = phone.trim();
 
-      setUser({ ...user, full_name: fullName.trim() });
+      await supabase.from('profiles').update(profilePayload).eq('id', user.id);
+
+      // 3. Fallback/Sync via backend service key to bypass any RLS policy issues
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData?.session?.access_token;
+        if (token) {
+          const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+          await fetch(`${API_URL}/api/update-profile`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              token,
+              full_name: fullName.trim(),
+              phone: phone !== undefined ? phone.trim() : undefined,
+            }),
+          });
+        }
+      } catch (beErr) {
+        console.warn('Backend profile update note:', beErr);
+      }
+
+      setUser({ ...user, full_name: fullName.trim(), ...(phone !== undefined ? { phone: phone.trim() } : {}) });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Update failed';
       setError(message);
@@ -202,15 +254,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setError(null);
       if (!user) throw new Error('Not authenticated');
 
-      // Delete user data from profiles and related tables
-      await supabase.from('subscriptions').delete().eq('user_id', user.id);
-      await supabase.from('payments').delete().eq('user_id', user.id);
-      await supabase.from('profiles').delete().eq('id', user.id);
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
 
-      // Remove avatar from storage if exists
+      // 1. Call backend to completely delete user from profiles, payments, subscriptions, and Supabase auth
+      if (token) {
+        try {
+          const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+          await fetch(`${API_URL}/api/delete-account`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token }),
+          });
+        } catch (apiErr) {
+          console.warn('Backend delete account error:', apiErr);
+        }
+      }
+
+      // 2. Direct Supabase delete attempts (client-side backup)
+      try { await supabase.from('subscriptions').delete().eq('user_id', user.id); } catch {}
+      try { await supabase.from('payments').delete().eq('user_id', user.id); } catch {}
+      try { await supabase.from('profiles').delete().eq('id', user.id); } catch {}
+
+      // 3. Remove avatar from storage if exists
       if (user.avatar_url) {
-        const ext = user.avatar_url.split('.').pop()?.split('?')[0];
-        await supabase.storage.from('avatars').remove([`avatars/${user.id}.${ext}`]);
+        try {
+          const ext = user.avatar_url.split('.').pop()?.split('?')[0];
+          await supabase.storage.from('avatars').remove([`avatars/${user.id}.${ext}`]);
+        } catch {}
       }
 
       setUser(null);
@@ -232,10 +303,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  async function resetPassword(email: string) {
+    try {
+      setError(null);
+      if (!email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) throw new Error('Please provide a valid email address');
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/login`,
+      });
+      if (resetError) throw resetError;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to send password reset email';
+      setError(message);
+      throw err;
+    }
+  }
+
   function clearError() { setError(null); }
 
   return (
-    <AuthContext.Provider value={{ user, loading, error, signup, signin, updateProfile, uploadAvatar, deleteAccount, signOut, clearError }}>
+    <AuthContext.Provider value={{ user, loading, error, signup, signin, updateProfile, uploadAvatar, deleteAccount, signOut, clearError, resetPassword }}>
       {children}
     </AuthContext.Provider>
   );

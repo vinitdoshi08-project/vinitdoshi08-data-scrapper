@@ -4,15 +4,29 @@ import { useAuth } from '../contexts/AuthContext';
 import { useSubscription, planLabel } from '../contexts/SubscriptionContext';
 import {
   X, Edit2, Check, Loader2, LogOut, Crown, Mail, User,
-  Calendar, Shield, Zap, ChevronRight,
+  Calendar, Shield, Zap, ChevronRight, Phone, ChevronDown,
 } from 'lucide-react';
+
+const COUNTRY_CODES = [
+  { code: '+91', country: 'IN', flag: '🇮🇳', name: 'India' },
+  { code: '+1',  country: 'US', flag: '🇺🇸', name: 'United States' },
+  { code: '+44', country: 'GB', flag: '🇬🇧', name: 'United Kingdom' },
+  { code: '+61', country: 'AU', flag: '🇦🇺', name: 'Australia' },
+  { code: '+49', country: 'DE', flag: '🇩🇪', name: 'Germany' },
+  { code: '+33', country: 'FR', flag: '🇫🇷', name: 'France' },
+  { code: '+971',country: 'AE', flag: '🇦🇪', name: 'UAE' },
+  { code: '+65', country: 'SG', flag: '🇸🇬', name: 'Singapore' },
+  { code: '+81', country: 'JP', flag: '🇯🇵', name: 'Japan' },
+  { code: '+1',  country: 'CA', flag: '🇨🇦', name: 'Canada' },
+];
 
 interface Props {
   onClose: () => void;
 }
 
 export function ProfileModal({ onClose }: Props) {
-  const { user, signOut, updateProfile } = useAuth() as any;  const { plan, can_scrape, trial_ends_at, billing_cycle, loading: subLoading } =
+  const { user, signOut, updateProfile } = useAuth() as any;
+  const { plan, can_scrape, trial_ends_at, billing_cycle, loading: subLoading } =
     useSubscription() as any;
   const expires_at = (useSubscription() as any).expires_at ?? null;
   const navigate = useNavigate();
@@ -20,13 +34,27 @@ export function ProfileModal({ onClose }: Props) {
   const [tab, setTab]             = useState<'profile' | 'edit'>('profile');
   const [editName, setEditName]   = useState(user?.full_name || '');
   const [editEmail, setEditEmail] = useState(user?.email || '');
+  const [countryCode, setCountryCode] = useState('+91');
+  const [editPhone, setEditPhone] = useState(user?.phone || '');
   const [profileError, setProfileError] = useState('');
   const [isUpdating, setIsUpdating]     = useState(false);
   const [savedOk, setSavedOk]           = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   useEffect(() => {
-    if (user) { setEditName(user.full_name || ''); setEditEmail(user.email || ''); }
+    if (user) {
+      setEditName(user.full_name || '');
+      setEditEmail(user.email || '');
+      if (user.phone) {
+        const found = COUNTRY_CODES.find(c => user.phone.startsWith(c.code));
+        if (found) {
+          setCountryCode(found.code);
+          setEditPhone(user.phone.slice(found.code.length).trim());
+        } else {
+          setEditPhone(user.phone);
+        }
+      }
+    }
   }, [user]);
 
   const userInitials = user?.full_name
@@ -34,6 +62,7 @@ export function ProfileModal({ onClose }: Props) {
 
   const isPaid    = plan === 'basic' || plan === 'standard';
   const isExpired = !can_scrape && !subLoading;
+  const selectedCountry = COUNTRY_CODES.find(c => c.code === countryCode) || COUNTRY_CODES[0];
 
   function fmtDate(iso: string | null | undefined) {
     if (!iso) return '—';
@@ -51,7 +80,8 @@ export function ProfileModal({ onClose }: Props) {
     setIsUpdating(true);
     try {
       if (updateProfile) {
-        await updateProfile(editName.trim(), editEmail.trim());
+        const fullPhone = editPhone.trim() ? `${countryCode} ${editPhone.trim()}` : '';
+        await updateProfile(editName.trim(), editEmail.trim(), fullPhone);
         setSavedOk(true);
         setTimeout(() => { setSavedOk(false); setTab('profile'); }, 1200);
       }
@@ -160,6 +190,7 @@ export function ProfileModal({ onClose }: Props) {
               {[
                 { icon: <User className="w-4 h-4 text-indigo-500" />,     label: 'Full Name',    value: user?.full_name || '—' },
                 { icon: <Mail className="w-4 h-4 text-indigo-500" />,     label: 'Email',        value: user?.email     || '—' },
+                { icon: <Phone className="w-4 h-4 text-indigo-500" />,    label: 'Phone',        value: user?.phone     || 'Not set' },
                 { icon: <Calendar className="w-4 h-4 text-indigo-500" />, label: 'Member Since', value: joinDate               },
               ].map(row => (
                 <div key={row.label} className="flex items-center gap-3.5 px-4 py-3.5 rounded-xl bg-gray-50 border border-gray-100 hover:border-indigo-100 hover:bg-indigo-50/30 transition-colors">
@@ -272,6 +303,42 @@ export function ProfileModal({ onClose }: Props) {
                 </div>
               </div>
 
+              <div>
+                <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">
+                  Phone Number (Optional)
+                </label>
+                <div className="flex gap-2">
+                  <div className="relative">
+                    <select
+                      value={countryCode}
+                      onChange={e => setCountryCode(e.target.value)}
+                      className="h-[42px] pl-8 pr-6 border border-gray-200 rounded-xl text-xs font-semibold text-gray-700 bg-gray-50 hover:bg-white outline-none focus:ring-2 focus:ring-indigo-500 appearance-none cursor-pointer transition-all"
+                    >
+                      {COUNTRY_CODES.map(c => (
+                        <option key={c.code} value={c.code}>
+                          {c.flag} {c.code}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-sm pointer-events-none select-none">
+                      {selectedCountry.flag}
+                    </span>
+                    <ChevronDown className="w-3 h-3 text-gray-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
+
+                  <div className="relative flex-1">
+                    <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                    <input
+                      type="tel"
+                      value={editPhone}
+                      onChange={e => setEditPhone(e.target.value.replace(/[^\d\s-]/g, ''))}
+                      placeholder="98765 43210"
+                      className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white"
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="flex gap-3 pt-1">
                 <button type="button"
                   onClick={() => { setTab('profile'); setProfileError(''); setEditName(user?.full_name || ''); setEditEmail(user?.email || ''); }}
@@ -293,21 +360,21 @@ export function ProfileModal({ onClose }: Props) {
 
       {/* Sign out confirm overlay */}
       {showLogoutConfirm && (
-        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4"
-          style={{ background: 'rgba(15,15,30,0.6)', backdropFilter: 'blur(6px)', fontFamily: FF }}>
-          <div className="bg-white rounded-2xl p-7 max-w-xs w-full shadow-2xl text-center">
-            <div className="w-12 h-12 rounded-full bg-orange-50 flex items-center justify-center mx-auto mb-4">
-              <LogOut className="w-6 h-6 text-orange-500" />
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 backdrop-blur-md"
+          style={{ background: 'rgba(15, 23, 42, 0.55)', fontFamily: FF }}>
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl text-center border border-[#e2e8f0]">
+            <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center mx-auto mb-4 text-amber-500 shadow-xs">
+              <LogOut className="w-7 h-7" />
             </div>
-            <h3 className="text-lg font-bold text-gray-900 mb-1">Sign out?</h3>
-            <p className="text-sm text-gray-400 mb-5">You'll need to sign in again to access your account.</p>
-            <div className="flex gap-3">
+            <h3 className="text-xl font-bold text-[#0f172a] mb-2 tracking-tight">Sign out?</h3>
+            <p className="text-sm text-[#64748b] mb-6 leading-relaxed">Are you sure you want to sign out? You'll need to sign in again to access your account.</p>
+            <div className="flex items-center gap-3">
               <button onClick={() => setShowLogoutConfirm(false)}
-                className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">
+                className="flex-1 py-2.5 px-4 border border-[#e2e8f0] rounded-xl text-sm font-semibold text-[#475569] bg-[#f8fafc] hover:bg-white hover:border-[#cbd5e1] hover:text-[#1e293b] hover:shadow-xs transition-all cursor-pointer">
                 Cancel
               </button>
               <button onClick={handleSignOut}
-                className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white bg-gray-800 hover:bg-gray-900 transition-colors">
+                className="flex-1 py-2.5 px-4 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-red-600 to-rose-600 hover:from-white hover:to-white hover:text-red-600 hover:border-red-600 border border-transparent shadow-md hover:shadow-lg transition-all cursor-pointer">
                 Sign out
               </button>
             </div>

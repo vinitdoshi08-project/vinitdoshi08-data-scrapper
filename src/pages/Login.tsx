@@ -1,16 +1,23 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Eye, EyeOff, Loader2, Mail, Lock, CheckCircle2 } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Mail, Lock, CheckCircle2, X } from 'lucide-react';
 
 export function Login() {
   const navigate = useNavigate();
-  const { signin, user, loading } = useAuth();
+  const { signin, resetPassword, user, loading } = useAuth();
   const [formLoading, setFormLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [errors, setErrors] = useState<{ [k: string]: string }>({});
   const [remember, setRemember] = useState(false);
+
+  // Forgot password modal state
+  const [showForgotModal, setShowForgotModal] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotSuccess, setForgotSuccess] = useState(false);
+  const [forgotError, setForgotError] = useState('');
 
   useEffect(() => {
     if (!loading && user) navigate('/dashboard', { replace: true });
@@ -47,6 +54,32 @@ export function Login() {
     }
   }
 
+  async function handleForgotSubmit(ev: React.FormEvent) {
+    ev.preventDefault();
+    setForgotError('');
+    if (!forgotEmail.trim() || !forgotEmail.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+      setForgotError('Please enter a valid email address.');
+      return;
+    }
+    try {
+      setForgotLoading(true);
+      await resetPassword(forgotEmail.trim());
+      setForgotSuccess(true);
+    } catch (err) {
+      setForgotError(err instanceof Error ? err.message : 'Failed to send reset link.');
+    } finally {
+      setForgotLoading(false);
+    }
+  }
+
+  function openForgotPassword(e: React.MouseEvent) {
+    e.preventDefault();
+    setForgotEmail(formData.email || '');
+    setForgotError('');
+    setForgotSuccess(false);
+    setShowForgotModal(true);
+  }
+
   const FF = 'ui-sans-serif,system-ui,-apple-system,sans-serif';
 
   return (
@@ -58,9 +91,9 @@ export function Login() {
         background: '#ffffff', position: 'relative',
       }}>
         {/* Top nav */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 40px 0' }}>
-          <Link to="/">
-            <img src="/scrapify.png" alt="Scrapify" style={{ height: 44, width: 'auto', objectFit: 'contain' }} />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '24px 40px 0' }}>
+          <Link to="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
+            <img src="/scrapify_logo.png" alt="Scrapify" style={{ height: 36, width: 'auto', objectFit: 'contain', display: 'block' }} />
           </Link>
           <p style={{ fontSize: 13.5, color: '#6b7280', fontWeight: 400 }}>
             New here?{' '}
@@ -122,9 +155,13 @@ export function Login() {
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                   <label style={{ fontSize: 13, fontWeight: 500, color: '#374151' }}>Password</label>
-                  <a href="#" style={{ fontSize: 12.5, color: '#5B4FE8', fontWeight: 500, textDecoration: 'none' }}>
+                  <button
+                    type="button"
+                    onClick={openForgotPassword}
+                    style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 12.5, color: '#5B4FE8', fontWeight: 500, textDecoration: 'none' }}
+                  >
                     Forgot password?
-                  </a>
+                  </button>
                 </div>
                 <div style={{ position: 'relative' }}>
                   <Lock style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', width: 15, height: 15, color: errors.password ? '#ef4444' : '#9ca3af', pointerEvents: 'none' }} />
@@ -248,6 +285,150 @@ export function Login() {
         </div>
       </div>
 
+      {/* ── Forgot Password Modal ── */}
+      {showForgotModal && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 100,
+          background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+        }}>
+          <div style={{
+            background: '#ffffff', borderRadius: 16, width: '100%', maxWidth: 420,
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+            padding: '28px 24px', position: 'relative', fontFamily: FF,
+            animation: 'modalIn .2s ease-out',
+          }}>
+            <button
+              type="button"
+              onClick={() => setShowForgotModal(false)}
+              style={{
+                position: 'absolute', top: 18, right: 18,
+                background: '#f3f4f6', border: 'none', borderRadius: '50%',
+                width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', color: '#6b7280', transition: 'background .15s',
+              }}
+              onMouseOver={e => e.currentTarget.style.background = '#e5e7eb'}
+              onMouseOut={e => e.currentTarget.style.background = '#f3f4f6'}
+            >
+              <X style={{ width: 16, height: 16 }} />
+            </button>
+
+            {forgotSuccess ? (
+              <div style={{ textAlign: 'center', padding: '12px 6px' }}>
+                <div style={{
+                  width: 52, height: 52, borderRadius: '50%', background: '#ecfdf5',
+                  color: '#10b981', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  marginBottom: 16,
+                }}>
+                  <CheckCircle2 style={{ width: 30, height: 30 }} />
+                </div>
+                <h3 style={{ fontSize: 20, fontWeight: 700, color: '#111827', marginBottom: 8 }}>
+                  Check your email
+                </h3>
+                <p style={{ fontSize: 14, color: '#6b7280', lineHeight: 1.6, marginBottom: 24 }}>
+                  We've sent password reset instructions to <strong style={{ color: '#374151' }}>{forgotEmail}</strong>. Please check your inbox or spam folder.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowForgotModal(false)}
+                  style={{
+                    width: '100%', padding: '11px 20px', borderRadius: 10, border: 'none',
+                    background: '#5B4FE8', color: '#fff', fontSize: 14.5, fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Back to sign in
+                </button>
+              </div>
+            ) : (
+              <div>
+                <div style={{
+                  width: 44, height: 44, borderRadius: 12, background: '#eef2ff',
+                  color: '#5B4FE8', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  marginBottom: 16,
+                }}>
+                  <Lock style={{ width: 22, height: 22 }} />
+                </div>
+                <h3 style={{ fontSize: 20, fontWeight: 700, color: '#111827', marginBottom: 6 }}>
+                  Reset your password
+                </h3>
+                <p style={{ fontSize: 13.5, color: '#6b7280', lineHeight: 1.5, marginBottom: 20 }}>
+                  Enter your account email address and we'll send you a link to reset your password.
+                </p>
+
+                {forgotError && (
+                  <div style={{
+                    marginBottom: 16, background: '#fef2f2', border: '1px solid #fecaca',
+                    color: '#dc2626', padding: '9px 12px', borderRadius: 8, fontSize: 13,
+                  }}>
+                    {forgotError}
+                  </div>
+                )}
+
+                <form onSubmit={handleForgotSubmit}>
+                  <div style={{ marginBottom: 18 }}>
+                    <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 6 }}>
+                      Email address
+                    </label>
+                    <div style={{ position: 'relative' }}>
+                      <Mail style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', width: 15, height: 15, color: '#9ca3af', pointerEvents: 'none' }} />
+                      <input
+                        type="email"
+                        required
+                        value={forgotEmail}
+                        onChange={e => { setForgotEmail(e.target.value); setForgotError(''); }}
+                        placeholder="you@company.com"
+                        style={{
+                          width: '100%', boxSizing: 'border-box',
+                          padding: '11px 14px 11px 38px',
+                          fontSize: 14, color: '#111827', fontFamily: FF,
+                          border: '1.5px solid #e5e7eb', borderRadius: 10, outline: 'none',
+                        }}
+                        onFocus={e => { e.currentTarget.style.borderColor = '#5B4FE8'; }}
+                        onBlur={e => { e.currentTarget.style.borderColor = '#e5e7eb'; }}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <button
+                      type="button"
+                      onClick={() => setShowForgotModal(false)}
+                      style={{
+                        flex: 1, padding: '11px 16px', borderRadius: 10, border: '1.5px solid #e5e7eb',
+                        background: '#fff', color: '#4b5563', fontSize: 14, fontWeight: 600,
+                        cursor: 'pointer', fontFamily: FF,
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={forgotLoading}
+                      style={{
+                        flex: 1.4, padding: '11px 16px', borderRadius: 10, border: 'none',
+                        background: 'linear-gradient(135deg, #5B4FE8 0%, #7C6FEF 100%)',
+                        color: '#fff', fontSize: 14, fontWeight: 600,
+                        cursor: forgotLoading ? 'not-allowed' : 'pointer', fontFamily: FF,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                        opacity: forgotLoading ? 0.7 : 1,
+                      }}
+                    >
+                      {forgotLoading ? (
+                        <><Loader2 style={{ width: 15, height: 15, animation: 'spin .7s linear infinite' }} /> Sending…</>
+                      ) : (
+                        'Send reset link'
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      <style>{`@keyframes modalIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }`}</style>
     </div>
   );
 }

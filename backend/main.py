@@ -31,7 +31,13 @@ from scraper import (
 load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
 
 import threading
-from email_service import send_admin_notification, send_welcome_email, send_otp_email
+from email_service import (
+    send_admin_notification,
+    send_welcome_email,
+    send_otp_email,
+    send_subscription_admin_notification,
+    send_subscription_customer_email,
+)
 
 app = FastAPI()
 
@@ -82,13 +88,12 @@ async def sb_get_profile(user_id: str) -> Optional[dict]:
             r = await client.get(
                 f"{SUPABASE_URL}/rest/v1/profiles",
                 headers=_sb_headers(),
-                params={"id": f"eq.{user_id}", "select": "id,plan,trial_ends_at,created_at"},
+                params={"id": f"eq.{user_id}", "select": "id,email,full_name,phone,plan,trial_ends_at,created_at,ip_address,ip_country,ip_city"},
             )
             print(f"[sb_get_profile] status={r.status_code}")
             if r.status_code == 200:
                 rows = r.json()
                 return rows[0] if rows else None
-            # 400 usually means id column type mismatch (bigint vs uuid) — treat as no profile
             return None
     except Exception as e:
         print(f"[sb_get_profile] exception: {e}")
@@ -182,6 +187,10 @@ class SignupNotification(BaseModel):
     full_name: str
     email: EmailStr
     plan: str
+    phone: Optional[str] = None
+    country: Optional[str] = None
+    city: Optional[str] = None
+    ip_address: Optional[str] = None
 
 # Removed unused Pydantic models
 
@@ -250,13 +259,71 @@ def decode_token(token: str) -> str:
 
 @app.post("/api/notify-signup")
 async def notify_signup(data: SignupNotification, request: Request):
-    ip_address = request.client.host if request.client else "Unknown"
+    # Resolve real client IP address (handling proxies / Cloudflare / reverse proxies)
+    x_forwarded = request.headers.get("X-Forwarded-For")
+    cf_connecting = request.headers.get("CF-Connecting-IP")
+    if cf_connecting:
+        client_ip = cf_connecting.strip()
+    elif x_forwarded:
+        client_ip = x_forwarded.split(",")[0].strip()
+    elif data.ip_address and data.ip_address != "Unknown":
+        client_ip = data.ip_address
+    elif request.client and request.client.host:
+        client_ip = request.client.host
+    else:
+        client_ip = "Unknown"
+
     os_type = request.headers.get("User-Agent", "Unknown")
     registration_time = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
-    
+
+    # Geolocation resolution
+    country = data.country or "Unknown"
+    city = data.city or "Unknown"
+
+    # If IP is public (not private / loopback / unknown), attempt geo-lookup if not provided
+    if client_ip and client_ip not in ("127.0.0.1", "localhost", "::1", "Unknown") and (country == "Unknown" or city == "Unknown"):
+        try:
+            async with httpx.AsyncClient(timeout=4) as geo_client:
+                geo_res = await geo_client.get(f"http://ip-api.com/json/{client_ip}?fields=status,country,city")
+                if geo_res.status_code == 200:
+                    geo_json = geo_res.json()
+                    if geo_json.get("status") == "success":
+                        if country == "Unknown":
+                            country = geo_json.get("country", "Unknown")
+                        if city == "Unknown":
+                            city = geo_json.get("city", "Unknown")
+        except Exception as e:
+            print(f"[notify-signup] Geo lookup failed for {client_ip}: {e}")
+
+    # Update profiles table in Supabase with ip_address, ip_country, ip_city, and phone if available
+    if SUPABASE_URL and SUPABASE_SERVICE_KEY:
+        try:
+            patch_data = {
+                "ip_address": client_ip,
+                "ip_country": country,
+                "ip_city": city,
+            }
+            if data.phone:
+                patch_data["phone"] = data.phone
+
+            headers = {
+                "apikey": SUPABASE_SERVICE_KEY,
+                "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
+                "Content-Type": "application/json",
+            }
+            async with httpx.AsyncClient(timeout=8) as client:
+                await client.patch(
+                    f"{SUPABASE_URL}/rest/v1/profiles",
+                    headers=headers,
+                    params={"email": f"eq.{data.email}"},
+                    json=patch_data,
+                )
+        except Exception as e:
+            print(f"[notify-signup] Failed to update profile with IP/geo/phone: {e}")
+
     threading.Thread(
         target=send_admin_notification, 
-        args=(data.full_name, data.email, data.plan, registration_time, ip_address, os_type)
+        args=(data.full_name, data.email, data.plan, registration_time, client_ip, os_type, country, city, data.phone or "Not provided")
     ).start()
     
     threading.Thread(
@@ -264,12 +331,87 @@ async def notify_signup(data: SignupNotification, request: Request):
         args=(data.email, data.full_name)
     ).start()
     
-    return {"status": "success"}
+    return {"status": "success", "ip_address": client_ip, "country": country, "city": city}
 
 
-# Unused Auth & API Key endpoints removed
+class UpdateProfileRequest(BaseModel):
+    token: str
+    full_name: Optional[str] = None
+    phone: Optional[str] = None
 
-# ── Scrape endpoint ───────────────────────────────────────────
+@app.post("/api/update-profile")
+async def api_update_profile(body: UpdateProfileRequest):
+    uid = decode_token(body.token)
+    patch: dict = {}
+    if body.full_name is not None:
+        patch["full_name"] = body.full_name.strip()
+    if body.phone is not None:
+        patch["phone"] = body.phone.strip()
+    patch["updated_at"] = datetime.utcnow().isoformat()
+
+    ok = await sb_update_profile(uid, patch)
+    if not ok:
+        # If the row didn't exist yet, try upserting with service key
+        if SUPABASE_URL and SUPABASE_SERVICE_KEY:
+            try:
+                headers = {
+                    "apikey": SUPABASE_SERVICE_KEY,
+                    "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
+                    "Content-Type": "application/json",
+                    "Prefer": "resolution=merge-duplicates",
+                }
+                async with httpx.AsyncClient(timeout=8) as client:
+                    await client.post(
+                        f"{SUPABASE_URL}/rest/v1/profiles",
+                        headers=headers,
+                        json={"id": uid, **patch},
+                    )
+            except Exception as e:
+                print(f"[api_update_profile] upsert failed: {e}")
+
+class DeleteAccountRequest(BaseModel):
+    token: str
+
+@app.post("/api/delete-account")
+async def api_delete_account(body: DeleteAccountRequest):
+    uid = decode_token(body.token)
+    if not uid:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    if SUPABASE_URL and SUPABASE_SERVICE_KEY:
+        headers = {
+            "apikey": SUPABASE_SERVICE_KEY,
+            "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
+            "Content-Type": "application/json",
+        }
+        async with httpx.AsyncClient(timeout=10) as client:
+            # 1. Delete subscriptions
+            try:
+                await client.delete(f"{SUPABASE_URL}/rest/v1/subscriptions", headers=headers, params={"user_id": f"eq.{uid}"})
+            except Exception as e:
+                print(f"[delete-account] delete subscriptions err: {e}")
+
+            # 2. Delete payments
+            try:
+                await client.delete(f"{SUPABASE_URL}/rest/v1/payments", headers=headers, params={"user_id": f"eq.{uid}"})
+            except Exception as e:
+                print(f"[delete-account] delete payments err: {e}")
+
+            # 3. Delete profiles row completely
+            try:
+                r_prof = await client.delete(f"{SUPABASE_URL}/rest/v1/profiles", headers=headers, params={"id": f"eq.{uid}"})
+                print(f"[delete-account] profiles deleted status={r_prof.status_code}")
+            except Exception as e:
+                print(f"[delete-account] delete profiles err: {e}")
+
+            # 4. Delete user from Supabase Auth admin
+            try:
+                r_auth = await client.delete(f"{SUPABASE_URL}/auth/v1/admin/users/{uid}", headers=headers)
+                print(f"[delete-account] auth user deleted status={r_auth.status_code}")
+            except Exception as e:
+                print(f"[delete-account] delete auth admin err: {e}")
+
+    return {"status": "success", "message": "Account completely deleted"}
 def validate_file_name(name: str) -> bool:
     return bool(name and len(name) <= 100 and re.match(r'^[\w\-. ]+$', name))
 
@@ -498,6 +640,42 @@ async def create_rzp_subscription(body: CreateSubscriptionRequest):
         raise HTTPException(status_code=400, detail="Invalid plan.")
 
     uid = decode_token(body.token)
+    now = datetime.utcnow()
+
+    # Check current active plan for downgrade restrictions
+    if SUPABASE_URL and SUPABASE_SERVICE_KEY:
+        try:
+            async with httpx.AsyncClient(timeout=8) as client:
+                cr = await client.get(
+                    f"{SUPABASE_URL}/rest/v1/subscriptions",
+                    headers=_sb_headers(),
+                    params={
+                        "user_id": f"eq.{uid}",
+                        "status":  "eq.active",
+                        "order":   "created_at.desc",
+                        "limit":   "1",
+                        "select":  "plan_type,expires_at,billing_cycle",
+                    },
+                )
+                if cr.status_code == 200 and cr.json():
+                    c_sub = cr.json()[0]
+                    c_exp = _parse_iso(c_sub.get("expires_at"))
+                    is_active = c_exp and c_exp.replace(tzinfo=None) > now if c_exp else False
+                    if is_active:
+                        if c_sub.get("billing_cycle") == "yearly" and body.billing_cycle == "monthly":
+                            raise HTTPException(
+                                status_code=400,
+                                detail="Switching from an active Yearly plan to Monthly is not permitted."
+                            )
+                        if c_sub.get("plan_type") == "standard" and body.plan == "basic" and body.billing_cycle == "monthly":
+                            raise HTTPException(
+                                status_code=400,
+                                detail="Downgrading from Standard to Basic while active is not permitted."
+                            )
+        except HTTPException:
+            raise
+        except Exception as e:
+            print(f"[create-subscription] check current error: {e}")
 
     # Amount in INR paise (fetch live rate)
     try:
@@ -865,12 +1043,22 @@ async def save_subscription(body: SaveSubscriptionRequest):
 
     plan_active = current_exp_dt and current_exp_dt > now if current_exp_dt else False
 
-    # ── Decide what to do ─────────────────────────────────────
-    # Cases:
-    # A) No plan / expired → start immediately
-    # B) Same plan + active → renewal: new subscription starts at end of current
-    # C) Upgrade (higher rank) + active → start immediately, old ends now
-    # D) Downgrade (lower rank) + active → queue as upcoming, starts at current expiry
+    # ── Strict Downgrade Prevention ─────────────────────────
+    current_cycle = current_sub.get("billing_cycle", "monthly") if current_sub else "monthly"
+
+    # If currently active on Yearly, cannot degrade to Monthly until yearly period ends
+    if plan_active and current_cycle == "yearly" and body.billing_cycle == "monthly":
+        raise HTTPException(
+            status_code=400,
+            detail="Your account is on an active Yearly plan. Changing to Monthly is not permitted during your yearly period."
+        )
+
+    # If active on Standard Monthly, user cannot downgrade to Basic Monthly (can only switch to Yearly)
+    if plan_active and current_plan == "standard" and new_plan == "basic" and body.billing_cycle == "monthly":
+        raise HTTPException(
+            status_code=400,
+            detail="Downgrading from Standard to Basic while your monthly plan is active is not permitted."
+        )
 
     action = "immediate"  # default
 
@@ -1038,6 +1226,59 @@ async def save_subscription(body: SaveSubscriptionRequest):
         "status":         "captured",
         "created_at":     now_iso,
     })
+
+    # ── Send Notifications (Admin & Customer) in background ───
+    try:
+        profile_row = await sb_get_profile(uid)
+        user_name = (profile_row.get("full_name") if profile_row else "") or "Customer"
+        user_email = (profile_row.get("email") if profile_row else "") or ""
+        user_phone = (profile_row.get("phone") if profile_row else "") or "Not provided"
+        user_ip = (profile_row.get("ip_address") if profile_row else "") or "Unknown"
+        user_country = (profile_row.get("ip_country") if profile_row else "") or "Unknown"
+        user_city = (profile_row.get("ip_city") if profile_row else "") or "Unknown"
+
+        # Format amount (e.g. "$6.00" or "$60.00")
+        if body.currency == "USD":
+            amount_display = f"${amount_stored / 100:.2f} USD"
+        elif body.currency == "INR":
+            amount_display = f"₹{amount_stored / 100:.2f} INR"
+        else:
+            amount_display = f"{amount_stored / 100:.2f} {body.currency}"
+
+        # 1. Admin Email (Upgrade / Downgrade / Renewal)
+        threading.Thread(
+            target=send_subscription_admin_notification,
+            args=(
+                user_name,
+                user_email,
+                new_plan,
+                body.billing_cycle,
+                action,
+                amount_display,
+                body.razorpay_payment_id,
+                user_ip,
+                user_country,
+                user_city,
+                user_phone,
+            ),
+        ).start()
+
+        # 2. Customer Receipt / Confirmation Email
+        if user_email:
+            threading.Thread(
+                target=send_subscription_customer_email,
+                args=(
+                    user_email,
+                    user_name,
+                    new_plan,
+                    body.billing_cycle,
+                    action,
+                    amount_display,
+                    body.razorpay_payment_id,
+                ),
+            ).start()
+    except Exception as notify_err:
+        print(f"[save-subscription] email notification error: {notify_err}")
 
     return response_payload
 

@@ -133,9 +133,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     <div className="border-t border-[#e4eaf3] my-1" />
                     <button
                       onClick={() => { setShowLogoutConfirm(true); setDropOpen(false); }}
-                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13.5px] font-medium text-[#e0354c] hover:bg-[#feeaed] transition-colors"
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13.5px] font-semibold text-[#dc2626] hover:bg-[#fef2f2] transition-colors"
                     >
-                      <LogOut className="w-4 h-4" /> Sign out
+                      <LogOut className="w-4 h-4 text-[#dc2626]" /> Sign out
                     </button>
                   </div>
                 </>
@@ -163,24 +163,28 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Sign out confirm modal */}
       {showLogoutConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
-          style={{ background: 'rgba(23,32,51,0.45)' }}>
-          <div className="bg-white rounded-2xl p-7 max-w-sm w-full shadow-2xl text-center border border-[#e4eaf3]">
-            <div className="w-12 h-12 rounded-full bg-[#fff5df] flex items-center justify-center mx-auto mb-4">
-              <LogOut className="w-6 h-6 text-[#e59a26]" />
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-md transition-all duration-300"
+          style={{ background: 'rgba(15, 23, 42, 0.55)' }}
+        >
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl text-center border border-[#e2e8f0] transform transition-all animate-in fade-in zoom-in-95 duration-200">
+            <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center mx-auto mb-4 text-amber-500 shadow-xs">
+              <LogOut className="w-7 h-7" />
             </div>
-            <h3 className="text-lg font-bold text-[#172033] mb-1">Sign out?</h3>
-            <p className="text-sm text-[#758198] mb-5">You'll need to sign in again to access your account.</p>
-            <div className="flex gap-3">
+            <h3 className="text-xl font-bold text-[#0f172a] mb-2 tracking-tight">Sign out?</h3>
+            <p className="text-sm text-[#64748b] mb-6 leading-relaxed">
+              Are you sure you want to sign out? You will need to sign in again to access your scrapers.
+            </p>
+            <div className="flex items-center gap-3">
               <button
                 onClick={() => setShowLogoutConfirm(false)}
-                className="flex-1 py-2.5 border border-[#e4eaf3] rounded-xl text-sm font-semibold text-[#526078] hover:bg-[#f6f8fc] transition-colors"
+                className="flex-1 py-2.5 px-4 border border-[#e2e8f0] rounded-xl text-sm font-semibold text-[#475569] bg-[#f8fafc] hover:bg-white hover:border-[#cbd5e1] hover:text-[#1e293b] hover:shadow-xs transition-all cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSignOut}
-                className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white bg-[#172033] hover:bg-[#25334d] transition-colors"
+                className="flex-1 py-2.5 px-4 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-red-600 to-rose-600 hover:from-white hover:to-white hover:text-red-600 hover:border-red-600 border border-transparent shadow-md hover:shadow-lg transition-all cursor-pointer"
               >
                 Sign out
               </button>

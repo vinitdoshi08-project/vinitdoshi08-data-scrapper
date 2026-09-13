@@ -10,8 +10,8 @@ const PLAN_CONFIG = {
   free:    { name: 'Free', usdPrice: 0,   days: 3,   yearly: false },
   basic_m: { name: 'Basic',        usdPrice: 6,   days: 30,  yearly: false },
   basic_y: { name: 'Basic',        usdPrice: 60,  days: 365, yearly: true  },
-  std_m:   { name: 'Standard',     usdPrice: 10,  days: 30,  yearly: false },
-  std_y:   { name: 'Standard',     usdPrice: 108, days: 365, yearly: true  },
+  std_m:   { name: 'Standard',     usdPrice: 9,   days: 30,  yearly: false },
+  std_y:   { name: 'Standard',     usdPrice: 96,  days: 365, yearly: true  },
 } as const;
 
 type PlanKey = keyof typeof PLAN_CONFIG;
@@ -120,7 +120,17 @@ export function Signup() {
       setStatusMsg('Creating your account…');
       await signup(formData.fullName, formData.email, formData.password);
 
-      // Notify backend about signup for emails
+      // Try gathering client geo in parallel for signup record
+      let clientGeo: { ip?: string; country?: string; city?: string } = {};
+      try {
+        const geoRes = await fetch('https://ipapi.co/json/').catch(() => null);
+        if (geoRes && geoRes.ok) {
+          const gData = await geoRes.json();
+          clientGeo = { ip: gData.ip, country: gData.country_name, city: gData.city };
+        }
+      } catch {}
+
+      // Notify backend about signup for emails and profile geo/ip recording
       fetch(`${API_URL}/api/notify-signup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -128,6 +138,9 @@ export function Signup() {
           full_name: formData.fullName,
           email: formData.email,
           plan: planCfg.name,
+          ip_address: clientGeo.ip,
+          country: clientGeo.country,
+          city: clientGeo.city,
         }),
       }).catch(err => console.error("Notification error:", err));
 
@@ -356,9 +369,9 @@ export function Signup() {
       {/* ── RIGHT: Form Panel ── */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#ffffff' }}>
         {/* Top nav */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 40px 0' }}>
-          <Link to="/">
-            <img src="/scrapify.png" alt="Scrapify" style={{ height: 44, width: 'auto', objectFit: 'contain' }} />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '24px 40px 0' }}>
+          <Link to="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
+            <img src="/scrapify_logo.png" alt="Scrapify" style={{ height: 36, width: 'auto', objectFit: 'contain', display: 'block' }} />
           </Link>
           <p style={{ fontSize: 13.5, color: '#6b7280', fontWeight: 400 }}>
             Have an account?{' '}
@@ -386,7 +399,9 @@ export function Signup() {
                   <CreditCard style={{ width: 16, height: 16, color: '#fff' }} />
                 </div>
                 <div>
-                  <p style={{ fontSize: 13, fontWeight: 700, color: '#4338ca' }}>{planCfg.name} Plan</p>
+                  <p style={{ fontSize: 13, fontWeight: 700, color: '#4338ca' }}>
+                    {planCfg.name} Plan ({planCfg.yearly ? 'Yearly' : 'Monthly'}) — ${planCfg.usdPrice}{planCfg.yearly ? '/yr' : '/mo'}
+                  </p>
                   <p style={{ fontSize: 11.5, color: '#6366f1' }}>≈ ₹{inrApprox.toLocaleString('en-IN')} will be charged (live rate)</p>
                 </div>
               </div>
